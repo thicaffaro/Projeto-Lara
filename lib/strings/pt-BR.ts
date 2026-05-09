@@ -35,6 +35,22 @@ interface Step {
   description: string
 }
 
+/** Uma seção de conteúdo do modal de pré-onboarding */
+interface ModalSection {
+  heading: string
+  items: readonly string[]
+}
+
+/** Uma tela do tutorial de backup */
+interface BackupScreen {
+  title: string
+  description: string
+  /** 'all' = exibe em qualquer plataforma, 'android' | 'ios' = específico */
+  platform: 'all' | 'android' | 'ios'
+  /** Caminho de menu exibido como breadcrumb visual (opcional) */
+  pathLabel?: string
+}
+
 /** Card da BenefitsSection */
 interface BenefitCard {
   title: string
@@ -119,6 +135,32 @@ export interface Strings {
     privacy: string
     terms: string
     contact: string
+  }
+
+  preOnboarding: {
+    modal: {
+      title: string
+      subtitle: string
+      continuesSection: ModalSection
+      laraSection: ModalSection
+      youDecideSection: ModalSection
+      changesSection: ModalSection
+      backupButtonLabel: string
+      /** Exatamente 3 itens — um por checkbox obrigatório */
+      checkboxes: readonly [string, string, string]
+      ctaLabel: string
+      supportLabel: string
+      supportHref: string
+    }
+    backup: {
+      title: string
+      screens: ReadonlyArray<BackupScreen>
+      navBack: string
+      navNext: string
+      navDone: string
+      /** Template "Tela X de Y" — usa {current} e {total} como placeholders */
+      screenCountTemplate: string
+    }
   }
 }
 
@@ -301,5 +343,115 @@ export const ptBR: Strings = {
     privacy: 'Política de Privacidade',
     terms: 'Termos de Uso',
     contact: 'contato@laraassistente.com.br',
+  },
+
+  // ── PreOnboardingModal + BackupTutorialModal ───────────────────────────────
+  preOnboarding: {
+    modal: {
+      title: 'Antes de começar — leia com atenção',
+      subtitle:
+        'A Lara conecta seu número ao WhatsApp Business Cloud API oficial da Meta.',
+
+      continuesSection: {
+        heading: '✅ O que continua funcionando:',
+        items: [
+          'Suas clientes mandam mensagem para o mesmo número de sempre',
+          'Você gerencia tudo pelo painel da Lara',
+          'Suas conversas pessoais (família, amigos) continuam funcionando',
+        ],
+      },
+
+      laraSection: {
+        heading: '🤖 O que a Lara cuida automaticamente:',
+        items: [
+          'Mensagens de clientes que querem agendar, confirmar ou cancelar',
+          'Lembretes 24h e 2h antes das sessões',
+        ],
+      },
+
+      youDecideSection: {
+        heading: '👤 O que você decide:',
+        items: [
+          'Quem é cliente (Lara responde) e quem é pessoal (Lara fica em silêncio)',
+        ],
+      },
+
+      changesSection: {
+        heading: '⚠️ O que muda:',
+        items: [
+          'O app WhatsApp comum (verde) para de funcionar nesse número',
+          'Você passa a usar o painel da Lara',
+          'Conversas antigas continuam acessíveis após backup',
+        ],
+      },
+
+      backupButtonLabel: 'Ver tutorial de backup do WhatsApp',
+
+      checkboxes: [
+        'Eu fiz backup das minhas conversas (ou não preciso)',
+        'Entendi que vou gerenciar meu WhatsApp pelo painel da Lara',
+        'Entendi que conversas pessoais continuam minhas pelo painel',
+      ],
+
+      ctaLabel: 'Continuar para conexão',
+      supportLabel: 'Tenho dúvidas — falar com suporte',
+      supportHref: 'https://wa.me/5511978663056',
+    },
+
+    backup: {
+      title: 'Tutorial de backup do WhatsApp',
+      screens: [
+        {
+          title: 'Por que fazer backup?',
+          description:
+            'Ao conectar ao WhatsApp Business, suas conversas existentes ficam salvas ' +
+            'no backup. Recomendamos fazer agora para não perder nenhum histórico.',
+          platform: 'all',
+        },
+        {
+          title: 'Android — Passo 1 de 2',
+          description:
+            'Abra o WhatsApp e toque nos 3 pontos (⋮) no canto superior direito ' +
+            'para abrir o menu de configurações.',
+          platform: 'android',
+          pathLabel: 'Configurações → Conversas',
+        },
+        {
+          title: 'Android — Passo 2 de 2',
+          description:
+            'Toque em "Backup de conversas" e depois em "FAZER BACKUP". ' +
+            'Aguarde a conclusão antes de prosseguir.',
+          platform: 'android',
+          pathLabel: 'Configurações → Conversas → Backup de conversas → FAZER BACKUP',
+        },
+        {
+          title: 'iPhone — Passo 1 de 2',
+          description:
+            'Abra o WhatsApp e toque em "Configurações" (ícone de engrenagem) ' +
+            'no menu inferior direito.',
+          platform: 'ios',
+          pathLabel: 'Configurações → Conversas',
+        },
+        {
+          title: 'iPhone — Passo 2 de 2',
+          description:
+            'Toque em "Backup de conversas" e depois em "Fazer backup agora". ' +
+            'Aguarde a conclusão antes de prosseguir.',
+          platform: 'ios',
+          pathLabel: 'Configurações → Conversas → Backup de conversas → Fazer backup agora',
+        },
+        {
+          title: 'Pronto! Backup concluído.',
+          description:
+            'Suas conversas estão seguras. Agora você pode prosseguir ' +
+            'para a conexão da Lara com tranquilidade.',
+          platform: 'all',
+        },
+      ],
+      navBack: 'Voltar',
+      navNext: 'Próximo',
+      navDone: 'Entendi, voltar',
+      screenCountTemplate: 'Tela {current} de {total}',
+    },
   },
 }
