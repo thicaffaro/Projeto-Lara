@@ -24,10 +24,19 @@ Controla para onde o browser pode fazer requisições fetch, XHR e abrir WebSock
 | `wss://*.supabase.co` | WebSocket do Supabase Realtime — atualizações ao vivo no dashboard (ex: nova mensagem recebida, status da Lara). Mesmo wildcard do HTTPS acima. |
 | `https://graph.facebook.com` | WhatsApp Business Cloud API — envio de mensagens outbound, verificação de status de templates, leitura de webhooks de entrega. Utilizado por API routes que a Lara chama server-side; incluído aqui por precaução para possíveis chamadas client-side futuras (ex: preview de template). |
 | `https://api.mercadopago.com` | Mercado Pago — consulta de status de assinatura, criação de preferência de pagamento. Chamado tanto server-side (webhook handler) quanto potencialmente client-side (verificação de status no painel). |
-| `https://api.x.ai` | xAI Grok — LLM principal da Lara para classificação de intenção e geração de resposta. **Chamado exclusivamente via API route server-side.** Incluído em `connect-src` por precaução. Se confirmado 100% server-side, pode ser removido sem impacto funcional — fazê-lo reduziria a superfície de ataque. |
-| `https://api.anthropic.com` | Anthropic Claude Haiku — LLM fallback quando Grok está indisponível. Mesma justificativa e ressalva do `api.x.ai` acima. |
 | `https://nominatim.openstreetmap.org` | Geocodificação primária — converte endereço de domicílio em coordenadas para cálculo de área de atendimento (`service_mode='home'`). Pode ser chamado client-side no fluxo de onboarding. Gratuito, sem chave de API. |
 | `https://maps.googleapis.com` | Google Places API — geocodificação fallback quando Nominatim falha ou retorna resultado ambíguo. Requer `GOOGLE_PLACES_API_KEY`. Mesma finalidade do Nominatim acima. |
+
+#### Origens deliberadamente NÃO permitidas em `connect-src`
+
+| Origem | Motivo da exclusão |
+|---|---|
+| `https://api.x.ai` | xAI Grok — chamado **exclusivamente server-side** via `/lib/grok.ts`. Incluir em `connect-src` criaria superfície de ataque: JS injetado poderia tentar chamar o LLM diretamente e exfiltrar a `XAI_API_KEY` do ambiente. |
+| `https://api.anthropic.com` | Anthropic Claude — chamado **exclusivamente server-side** via `/lib/anthropic.ts`. Mesma justificativa do xAI acima. |
+
+> **Se no futuro for necessário streaming de respostas LLM diretamente no browser:**
+> revisar arquitetura de proxy via `/api/llm-proxy` antes de liberar qualquer LLM no CSP.
+> O proxy repassa o stream mantendo as API keys no servidor.
 
 ---
 
@@ -55,11 +64,15 @@ Controla quais scripts podem ser executados na página.
 
 ### `img-src`
 
+`https:` foi deliberadamente removido. Embora `img-src` não execute código, um escopo amplo permite que JS malicioso exfiltre dados via pixel tracking ou requisições a servidores controlados pelo atacante usando tags `<img>`. Origens restritas ao necessário:
+
 | Origem | Motivo |
 |---|---|
 | `'self'` | Imagens locais em `/public/` (logo, ícones, OG images) |
-| `data:` | Imagens base64 inline — SVGs de ícones, placeholders de componentes UI (ex: shadcn/ui), imagens geradas dinamicamente por bibliotecas de gráficos (Recharts exporta canvas como data URL) |
-| `https:` | Escopo amplo intencional: cobre URLs assinadas do Supabase Storage (fotos de clientes com TTL de 1h), CDNs de bibliotecas de UI, e quaisquer imagens externas futuras. Restringir para `*.supabase.co` quebraria uso de CDNs externos legítimos. Aceito porque `img-src` não executa código — risco limitado a conteúdo visual. |
+| `data:` | Imagens base64 inline — SVGs de ícones, placeholders de componentes UI (shadcn/ui), canvas exportado pelo Recharts como data URL |
+| `https://*.supabase.co` | URLs assinadas do Supabase Storage (bucket `client-media`) — fotos de clientes enviadas via WhatsApp, TTL de 1h por assinatura |
+| `https://*.googleusercontent.com` | Avatar do perfil Facebook exibido no modal de Embedded Signup do WhatsApp |
+| `https://www.facebook.com` | Assets estáticos do widget Meta durante o fluxo de Embedded Signup |
 
 ---
 

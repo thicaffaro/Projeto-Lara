@@ -29,9 +29,11 @@ const cspDirectives = [
   },
 
   // Fetch / XHR / WebSocket — origens que o browser pode acessar diretamente.
-  // LLMs (xAI, Anthropic) estão listados aqui pois são chamados via API routes
-  // do Next.js (server-side). A inclusão em connect-src é precautória; se
-  // permanecerem 100% server-side, podem ser removidos sem impacto funcional.
+  //
+  // DELIBERADAMENTE AUSENTES (server-side only — ver /docs/security.md):
+  //   api.x.ai, api.anthropic.com — chamados apenas em /lib/grok.ts e
+  //   /lib/anthropic.ts. Incluir aqui criaria superfície de ataque: JS injetado
+  //   poderia tentar chamar LLMs diretamente usando a API key do env.
   {
     directive: 'connect-src',
     sources: [
@@ -40,8 +42,6 @@ const cspDirectives = [
       'wss://*.supabase.co',        // Supabase Realtime (WebSocket) — dashboard ao vivo
       'https://graph.facebook.com', // WhatsApp Cloud API — envio/status de mensagens
       'https://api.mercadopago.com',// Mercado Pago — status de assinatura, checkout
-      'https://api.x.ai',           // xAI Grok — LLM principal (via API route)
-      'https://api.anthropic.com',  // Anthropic Claude — LLM fallback (via API route)
       'https://nominatim.openstreetmap.org', // Geocodificação primária — modo domicílio
       'https://maps.googleapis.com',         // Google Places — geocodificação fallback
     ],
@@ -67,11 +67,17 @@ const cspDirectives = [
     sources: ["'self'", "'unsafe-inline'"],
   },
 
-  // Imagens — https: cobre URLs assinadas do Supabase Storage (client-media)
-  // e quaisquer CDNs externos futuros. data: cobre SVGs e ícones base64 inline.
+  // Imagens — origens restritas ao necessário.
+  // https: deliberadamente removido — ver /docs/security.md.
   {
     directive: 'img-src',
-    sources: ["'self'", 'data:', 'https:'],
+    sources: [
+      "'self'",
+      'data:',                               // SVGs e ícones base64 (Recharts, shadcn/ui)
+      'https://*.supabase.co',               // URLs assinadas do Storage (fotos de clientes)
+      'https://*.googleusercontent.com',     // Avatar do perfil Facebook no Embedded Signup
+      'https://www.facebook.com',            // Assets do widget Meta / Embedded Signup
+    ],
   },
 
   // Fontes — data: cobre fontes base64 injetadas por alguns frameworks de UI.
