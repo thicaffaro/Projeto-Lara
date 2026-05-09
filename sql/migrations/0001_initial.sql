@@ -623,10 +623,17 @@ COMMENT ON MATERIALIZED VIEW busy_slots IS
 -- -----------------------------------------------------------------------------
 -- 1e. Função ensure_partition_exists
 -- Cria a partição mensal para a tabela e data informadas caso não exista.
--- Aplica RLS explicitamente na partição filha (defesa em profundidade):
---   • RLS no pai  → protege acesso via tabela pai (comportamento Postgres padrão)
---   • RLS na filha → protege acesso direto à partição (n8n, psql, dumps)
--- Copia todas as policies do pai para a partição criada via pg_policy.
+--
+-- Três camadas de segurança replicadas do pai para a filha:
+--   1) RLS habilitado  → ALTER TABLE partition ENABLE ROW LEVEL SECURITY
+--   2) Policies copiadas → via pg_policy (protege acesso direto à partição)
+--   3) GRANTs copiados  → via pg_class.relacl + aclexplode()
+--
+-- RLS e GRANT são INDEPENDENTES:
+--   • GRANT controla SE o role pode tocar na tabela (camada de acesso)
+--   • RLS  controla QUAIS linhas o role pode ver/modificar (camada de dados)
+-- Sem copiar GRANTs, partições filhas ficam inacessíveis para
+-- authenticated/service_role mesmo com RLS correto.
 -- -----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION ensure_partition_exists(
   p_table_name TEXT,
@@ -639,6 +646,8 @@ DECLARE
   v_policy         RECORD;
   v_roles_str      TEXT;
   v_cmd            TEXT;
+  v_grant          RECORD;
+  v_grant_sql      TEXT;
 BEGIN
   -- Nome: tablename_YYYY_MM
   v_partition_name := p_table_name || '_' || TO_CHAR(p_target_date, 'YYYY_MM');
@@ -717,13 +726,62 @@ BEGIN
     EXECUTE v_cmd;
   END LOOP;
 
-  RAISE NOTICE '[ensure_partition_exists] Partição criada: %', v_partition_name;
+  -- 3) Copia GRANTs da tabela pai via pg_class.relacl + aclexplode()
+  --
+  --    Por que é necessário:
+  --      GRANT controla SE o role pode acessar a tabela (independente de RLS).
+  --      Partições filhas NÃO herdam GRANTs do pai automaticamente no PostgreSQL.
+  --      Sem este passo, authenticated e service_role recebem "permission denied"
+  --      ao tentar acessar a partição diretamente, mesmo com RLS configurado.
+  --
+  --    Fonte: pg_class.relacl (array de aclitem). NULL = apenas owner tem acesso.
+  --    aclexplode() desempacota em (grantor, grantee, privilege_type, is_grantable).
+  --    grantee = 0 (OID) representa PUBLIC.
+  FOR v_grant IN
+    SELECT
+      CASE WHEN acl.grantee = 0
+        THEN 'PUBLIC'
+        ELSE acl.grantee::regrole::TEXT
+      END          AS grantee,
+      acl.privilege_type,
+      acl.is_grantable
+    FROM pg_class c
+    INNER JOIN pg_namespace n ON n.oid = c.relnamespace,
+    LATERAL aclexplode(c.relacl) AS acl
+    WHERE c.relname  = p_table_name
+      AND n.nspname  = current_schema()
+      AND c.relacl   IS NOT NULL   -- NULL = sem GRANTs explícitos; loop desnecessário
+  LOOP
+    IF v_grant.grantee = 'PUBLIC' THEN
+      v_grant_sql := format(
+        'GRANT %s ON TABLE %I TO PUBLIC',
+        v_grant.privilege_type, v_partition_name
+      );
+    ELSE
+      v_grant_sql := format(
+        'GRANT %s ON TABLE %I TO %I',
+        v_grant.privilege_type, v_partition_name, v_grant.grantee
+      );
+    END IF;
+
+    IF v_grant.is_grantable THEN
+      v_grant_sql := v_grant_sql || ' WITH GRANT OPTION';
+    END IF;
+
+    EXECUTE v_grant_sql;
+  END LOOP;
+
+  RAISE NOTICE '[ensure_partition_exists] Partição criada (RLS + policies + GRANTs replicados): %',
+    v_partition_name;
   RETURN v_partition_name;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 COMMENT ON FUNCTION ensure_partition_exists IS
-  'Cria partição mensal se não existir e replica todas as policies RLS do pai.
+  'Cria partição mensal se não existir e replica do pai:
+   (1) ALTER TABLE ... ENABLE ROW LEVEL SECURITY
+   (2) Todas as RLS policies via pg_policy
+   (3) Todos os GRANTs via pg_class.relacl + aclexplode()
    Chamada pelo trigger BEFORE INSERT em appointments, messages e audit_log.';
 
 -- -----------------------------------------------------------------------------
