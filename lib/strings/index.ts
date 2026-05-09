@@ -5,25 +5,25 @@
  * Idioma ativo: pt-BR (único suportado no MVP).
  *
  * ── Guia para i18n futuro ──────────────────────────────────────────────────
- * 1. Criar /lib/strings/en-US.ts com a mesma estrutura de `ptBR`
- * 2. Criar um hook `useStrings()` que lê o locale do contexto/cookie
- * 3. Substituir a exportação estática abaixo por `export { useStrings }`
- * 4. O tipo `Strings` garante que todo novo idioma implementa todas as chaves
+ * 1. Criar /lib/strings/en-US.ts:
+ *      import type { Strings } from './pt-BR'
+ *      export const enUS: Strings = { ... }
  *
- * Exemplo futuro:
- *   import { ptBR } from './pt-BR'
- *   import { enUS } from './en-US'
- *   const locales = { 'pt-BR': ptBR, 'en-US': enUS } satisfies Record<string, Strings>
+ * 2. O tipo `Strings` garante que todo novo idioma implementa todas as chaves.
+ *    TypeScript emite erro em compile-time se alguma chave estiver faltando.
+ *
+ * 3. Para locale dinâmico, criar hook useStrings():
+ *      const locales: Record<string, Strings> = { 'pt-BR': ptBR, 'en-US': enUS }
+ *      export function useStrings(): Strings { return locales[locale()] }
+ *
+ * 4. Substituir a exportação estática abaixo por `export { useStrings }`.
+ *    Os componentes não precisam mudar — continuam importando `{ strings }`.
  * ──────────────────────────────────────────────────────────────────────────
  */
 
-import { ptBR, type PtBR } from './pt-BR'
+import { ptBR, type Strings } from './pt-BR'
 
-/**
- * Tipo canônico das strings do produto.
- * Usar para validar que novos idiomas implementam todas as chaves.
- */
-export type Strings = PtBR
+export type { Strings }
 
 /**
  * Strings ativas.

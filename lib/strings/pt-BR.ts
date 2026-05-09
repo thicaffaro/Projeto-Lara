@@ -4,37 +4,127 @@
  *
  * Estrutura preparada para i18n futuro:
  *   - Cada chave de primeiro nível corresponde a um componente
- *   - Para adicionar novo idioma: criar /lib/strings/en-US.ts com a mesma estrutura
- *   - O tipo `Strings` (exportado via index.ts) pode ser usado para validar completude
+ *   - `Strings` é a interface canônica — novos idiomas devem implementá-la
+ *   - Para adicionar en-US: criar /lib/strings/en-US.ts satisfies Strings
  *
  * Vocabulário obrigatório (ver /docs/glossary.md):
- *   - "sessão"    em vez de "horário"
- *   - "protocolo" em vez de "serviço"
- *   - "cliente"   = cliente final da esteticista
+ *   - "sessão"       em vez de "horário" — na voz da Lara e da profissional
+ *   - "protocolo"    em vez de "serviço" — na voz da Lara e da profissional
+ *   - "cliente"      = cliente final da esteticista
  *   - "profissional" = esteticista que usa o Lara (nunca "cliente" na UI)
+ *
+ * Regra de vocabulário em falas simuladas (demos, mockups):
+ *   - Fala de CLIENTE (inbound):  vocabulário leigo natural ("tem horário?")
+ *   - Fala da LARA   (outbound):  vocabulário do nicho ("sessão", "protocolo")
+ *   - Fala da PROFISSIONAL:       vocabulário do nicho (igual à Lara)
+ *   - "às 14h" / hora do dia:     OK em qualquer contexto (é hora, não agendamento)
  */
 
-// ── Tipos internos ─────────────────────────────────────────────────────────
+// ── Interfaces reutilizadas ────────────────────────────────────────────────
 
+/** Mensagem de conversa simulada no DemoSection */
 interface ChatMessage {
-  /** Remetente: 'client' | 'mae' | 'lara' | 'system' */
+  /** 'client' | 'mae' | 'lara' | 'system' */
   from: string
   text: string
 }
 
+/** Passo do OnboardingSteps */
 interface Step {
   title: string
   description: string
 }
 
+/** Card da BenefitsSection */
 interface BenefitCard {
   title: string
   body: string
 }
 
-// ── Strings ────────────────────────────────────────────────────────────────
+// ── Interface canônica das strings ─────────────────────────────────────────
 
-export const ptBR = {
+export interface Strings {
+  hero: {
+    badge: string
+    headline: string
+    subheadline: string
+    cta: string
+    methodologyNote: {
+      text: string
+      linkLabel: string
+    }
+  }
+
+  productExplainer: {
+    title: string
+    laraColumn: {
+      title: string
+      items: readonly string[]
+    }
+    youColumn: {
+      title: string
+      items: readonly string[]
+    }
+    bottomText: string
+    learnMoreLink: {
+      label: string
+      href: string
+    }
+  }
+
+  benefits: {
+    notResponding: BenefitCard
+    reminders: BenefitCard
+    personalLifeStaysYours: BenefitCard
+  }
+
+  demo: {
+    clientBooking: {
+      title: string
+      messages: ReadonlyArray<ChatMessage>
+    }
+    personalMessage: {
+      title: string
+      messages: ReadonlyArray<ChatMessage>
+    }
+  }
+
+  pricing: {
+    plan: string
+    /** Valor numérico como string — formatação (R$, /mês) fica no componente */
+    price: string
+    trialNote: string
+    cta: string
+    included: readonly string[]
+    notes: readonly string[]
+  }
+
+  whatsappQA: {
+    title: string
+    questions: ReadonlyArray<{ q: string; a: string }>
+  }
+
+  onboarding: {
+    step1: Step
+    step2: Step
+    step3: Step
+  }
+
+  instagram: {
+    text: string
+  }
+
+  footer: {
+    consent: string
+    privacy: string
+    terms: string
+    contact: string
+  }
+}
+
+// ── Conteúdo em pt-BR ──────────────────────────────────────────────────────
+
+export const ptBR: Strings = {
 
   // ── HeroSection ───────────────────────────────────────────────────────────
   hero: {
@@ -61,7 +151,7 @@ export const ptBR = {
         'Clientes confirmando ou cancelando sessão',
         'Lembretes 24h e 2h antes da sessão',
         'Coleta de endereço para atendimento em domicílio',
-      ] as string[],
+      ],
     },
 
     youColumn: {
@@ -71,7 +161,7 @@ export const ptBR = {
         'Cliente que virou amiga — conversa pessoal',
         'Fornecedor ou distribuidora de produtos',
         'Qualquer assunto fora do escopo de agendamento',
-      ] as string[],
+      ],
     },
 
     bottomText:
@@ -90,32 +180,33 @@ export const ptBR = {
     notResponding: {
       title: 'Você não responde mais "tem horário?" 50 vezes por dia',
       body: 'A Lara conversa com suas clientes que querem agendar, oferece sessões, confirma e te avisa. Você fica livre pra fazer o que importa: atender bem.',
-    } satisfies BenefitCard,
+    },
 
     reminders: {
       title: 'Lembretes automáticos diminuem no-show',
       body: '24 horas e 2 horas antes da sessão, a Lara manda lembrete. Sua cliente não esquece, sua agenda não fica vazia.',
-    } satisfies BenefitCard,
+    },
 
     personalLifeStaysYours: {
       title: 'Sua vida pessoal continua sua',
       body: 'Família, amigas, mensagens fora do trabalho — a Lara entende e fica em silêncio. Você responde quando puder, exatamente como sempre fez.',
-    } satisfies BenefitCard,
+    },
   },
 
   // ── DemoSection ────────────────────────────────────────────────────────────
-  // "horário" nas falas das clientes é intencional: é o vocabulário real
-  // que as clientes usam. "sessão" é o vocabulário da profissional e da UI.
+  // Regra de vocabulário aplicada:
+  //   "horário" nas falas dos clientes é intencional — é o vocabulário leigo real.
+  //   A Lara responde com "sessão" / "limpeza às 14h" — vocabulário do nicho.
   demo: {
     clientBooking: {
       title: 'Cliente agendando — Lara responde',
       messages: [
         { from: 'client', text: 'Oi! Tem horário pra limpeza essa semana?' },
-        { from: 'lara',   text: 'Oi Carla! 😊 Tenho quinta às 14h ou sexta às 10h. Qual fica melhor?' },
+        { from: 'lara',   text: 'Oi Carla! 😊 Tenho sessão quinta às 14h ou sexta às 10h. Qual fica melhor?' },
         { from: 'client', text: 'Quinta às 14h!' },
-        { from: 'lara',   text: 'Perfeito! Confirmado: limpeza quinta às 14h. Te mando lembrete na quarta. Até quinta! 💛' },
+        { from: 'lara',   text: 'Perfeito! Confirmado: limpeza de pele quinta às 14h. Te mando lembrete na quarta. Até quinta! 💛' },
         { from: 'system', text: '✅ Confirmação enviada' },
-      ] as ChatMessage[],
+      ],
     },
 
     personalMessage: {
@@ -123,14 +214,13 @@ export const ptBR = {
       messages: [
         { from: 'mae',    text: 'Filha, você vem almoçar domingo?' },
         { from: 'system', text: '🔔 Sua mãe está esperando você no painel. A Lara não respondeu — é assunto pessoal.' },
-      ] as ChatMessage[],
+      ],
     },
   },
 
   // ── PricingSection ─────────────────────────────────────────────────────────
   pricing: {
     plan: 'Plano único',
-    /** Valor numérico como string para permitir formatação customizada no componente */
     price: '99',
     trialNote: '7 dias grátis para começar',
     cta: 'Começar agora grátis',
@@ -142,11 +232,11 @@ export const ptBR = {
       'Painel completo no celular para gerenciar tudo',
       'Atendimento studio OU domicílio',
       'Sem limite de mensagens ou clientes',
-    ] as string[],
+    ],
     notes: [
       'Pessoa física aceita. Não precisa de CNPJ.',
       'Trial começa quando seus templates forem aprovados pela Meta (1-2 dias).',
-    ] as string[],
+    ],
   },
 
   // ── WhatsAppQASection ──────────────────────────────────────────────────────
@@ -177,7 +267,7 @@ export const ptBR = {
         q: 'E se eu quiser cancelar?',
         a: 'Você desconecta na hora pelo painel. Em até 24 horas seu número volta a funcionar no WhatsApp normal.',
       },
-    ] as Array<{ q: string; a: string }>,
+    ],
   },
 
   // ── OnboardingSteps ────────────────────────────────────────────────────────
@@ -185,15 +275,15 @@ export const ptBR = {
     step1: {
       title: 'Conecte seu número',
       description: 'Em 2 minutos, sem trocar de chip',
-    } satisfies Step,
+    },
     step2: {
       title: 'Configure em 5 minutos',
       description: 'Onde atende, horários, protocolos, contatos pessoais',
-    } satisfies Step,
+    },
     step3: {
       title: 'A Lara assume a agenda',
       description: 'Você cuida do resto pelo painel',
-    } satisfies Step,
+    },
   },
 
   // ── InstagramTeaser ────────────────────────────────────────────────────────
@@ -213,5 +303,3 @@ export const ptBR = {
     contact: 'contato@laraassistente.com.br',
   },
 }
-
-export type PtBR = typeof ptBR
