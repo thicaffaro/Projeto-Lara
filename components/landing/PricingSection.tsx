@@ -32,7 +32,7 @@ export function PricingSection() {
             <p className="text-sm font-medium text-rose-100">{s.plan}</p>
             <div className="mt-2 flex items-end justify-center gap-1">
               <span className="text-2xl font-medium text-white">R$</span>
-              <span className="text-6xl font-bold text-white leading-none">99</span>
+              <span className="text-6xl font-bold text-white leading-none">{s.price}</span>
               <span className="mb-2 text-lg text-rose-200">/mês</span>
             </div>
             <p className="mt-3 text-sm text-rose-100">{s.trialNote}</p>
