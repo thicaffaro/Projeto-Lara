@@ -76,48 +76,14 @@ async function ensureClientMediaBucket(): Promise<void> {
  * - Profissional acessa apenas arquivos com path prefixado com seu professional_id
  * - Path obrigatório: {professional_id}/{contact_id}/{timestamp}_{filename}
  */
-async function applyClientMediaRLS(bucketName: string): Promise<void> {
-  // SELECT: profissional lê apenas seus arquivos
-  await supabaseAdmin.storage.from(bucketName)
-  // Políticas de storage são aplicadas via SQL no Supabase Dashboard ou via migration SQL.
-  // O Supabase JS SDK não expõe API para criar políticas programaticamente.
-  // As políticas abaixo devem ser executadas via SQL (ver comentário abaixo).
-
-  /*
-   * SQL para aplicar via Supabase Dashboard > SQL Editor:
-   *
-   * -- Leitura: profissional acessa apenas arquivos do seu professional_id
-   * CREATE POLICY "client_media_select"
-   * ON storage.objects FOR SELECT
-   * USING (
-   *   bucket_id = 'client-media'
-   *   AND (storage.foldername(name))[1] IN (
-   *     SELECT id::text FROM professionals WHERE auth_user_id = auth.uid()
-   *   )
-   * );
-   *
-   * -- Upload: profissional faz upload apenas para seu próprio folder
-   * CREATE POLICY "client_media_insert"
-   * ON storage.objects FOR INSERT
-   * WITH CHECK (
-   *   bucket_id = 'client-media'
-   *   AND (storage.foldername(name))[1] IN (
-   *     SELECT id::text FROM professionals WHERE auth_user_id = auth.uid()
-   *   )
-   * );
-   *
-   * -- Delete: profissional deleta apenas seus próprios arquivos
-   * CREATE POLICY "client_media_delete"
-   * ON storage.objects FOR DELETE
-   * USING (
-   *   bucket_id = 'client-media'
-   *   AND (storage.foldername(name))[1] IN (
-   *     SELECT id::text FROM professionals WHERE auth_user_id = auth.uid()
-   *   )
-   * );
-   *
-   * -- Service role (backend/n8n) tem acesso total — via SUPABASE_SERVICE_ROLE_KEY
-   */
+async function applyClientMediaRLS(_bucketName: string): Promise<void> {
+  // Políticas RLS de storage são aplicadas via SQL — o Supabase JS SDK não expõe
+  // API para criá-las programaticamente.
+  //
+  // Execute: psql $DATABASE_URL -f sql/migrations/0005_storage_policies.sql
+  //
+  // Ver /docs/setup.md passo 5 para instruções completas.
+  console.log('[storage-setup] RLS de client-media: executar 0005_storage_policies.sql')
 }
 
 // ── audit-archive ─────────────────────────────────────────────────────────────
@@ -146,15 +112,9 @@ async function ensureAuditArchiveBucket(): Promise<void> {
     console.log(`[storage-setup] Bucket "${BUCKET_NAME}" criado.`)
   }
 
-  /*
-   * audit-archive: acesso restrito apenas à service role key (backend/n8n).
-   * Nenhuma política RLS de usuário final é necessária.
-   *
-   * SQL para bloquear acesso anon/authenticated (apenas service role passa):
-   *
-   * -- Sem políticas públicas = apenas service role acessa
-   * -- Para confirmar, NÃO criar políticas USING (TRUE) neste bucket.
-   */
+  // RLS: sem políticas para roles públicas/autenticadas = apenas service_role acessa.
+  // Política de negação explícita aplicada via 0005_storage_policies.sql.
+  console.log('[storage-setup] RLS de audit-archive: executar 0005_storage_policies.sql')
 }
 
 // ── Ciclo de vida / retenção ──────────────────────────────────────────────────
