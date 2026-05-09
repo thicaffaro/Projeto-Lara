@@ -10,32 +10,42 @@
  *
  * Posicionamento crítico: Lara NÃO responde tudo — é camada SELETIVA.
  * Modos da Lara: full | booking_only | silent (ver /docs/glossary.md)
+ *
+ * prefers-reduced-motion: useReducedMotion() desativa slide/fade em todos os elementos.
  */
 
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import { strings } from '@/lib/strings'
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 20 },
-  visible: (i: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.4, ease: 'easeOut', delay: i * 0.08 },
-  }),
-}
-
 export function ProductExplainerSection() {
+  const shouldReduceMotion = useReducedMotion()
   const s = strings.productExplainer
+
+  // Variant definido dentro do componente para capturar shouldReduceMotion.
+  const fadeUp = {
+    hidden: { opacity: shouldReduceMotion ? 1 : 0, y: 0 },
+    visible: (i: number) => ({
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: shouldReduceMotion ? 0 : 0.4,
+        ease: 'easeOut',
+        delay: shouldReduceMotion ? 0 : i * 0.08,
+      },
+    }),
+  }
+
+  const d = (base: number) => (shouldReduceMotion ? 0 : base)
 
   return (
     <section className="bg-gray-50 px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
       <div className="mx-auto max-w-5xl">
         {/* Título */}
         <motion.h2
-          initial={{ opacity: 0, y: 16 }}
+          initial={{ opacity: shouldReduceMotion ? 1 : 0, y: 0 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.5 }}
+          transition={{ duration: d(0.5) }}
           className="mb-10 text-center text-2xl font-bold text-gray-900 sm:text-3xl"
         >
           {s.title}
@@ -45,10 +55,10 @@ export function ProductExplainerSection() {
         <div className="grid gap-4 sm:grid-cols-2">
           {/* Coluna esquerda — Lara cuida */}
           <motion.div
-            initial={{ opacity: 0, x: -16 }}
+            initial={{ opacity: shouldReduceMotion ? 1 : 0, x: shouldReduceMotion ? 0 : -16 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
+            transition={{ duration: d(0.5) }}
             className="rounded-2xl border border-rose-100 bg-white p-6 shadow-sm"
           >
             <div className="mb-4 flex items-center gap-2">
@@ -77,10 +87,10 @@ export function ProductExplainerSection() {
 
           {/* Coluna direita — Você responde */}
           <motion.div
-            initial={{ opacity: 0, x: 16 }}
+            initial={{ opacity: shouldReduceMotion ? 1 : 0, x: shouldReduceMotion ? 0 : 16 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: 0.1 }}
+            transition={{ duration: d(0.5), delay: d(0.1) }}
             className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm"
           >
             <div className="mb-4 flex items-center gap-2">
@@ -108,12 +118,12 @@ export function ProductExplainerSection() {
           </motion.div>
         </div>
 
-        {/* Texto explicativo abaixo */}
+        {/* Texto explicativo */}
         <motion.p
-          initial={{ opacity: 0, y: 12 }}
+          initial={{ opacity: shouldReduceMotion ? 1 : 0, y: 0 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.5, delay: 0.2 }}
+          transition={{ duration: d(0.5), delay: d(0.2) }}
           className="mt-8 text-center text-sm leading-relaxed text-gray-600 sm:text-base"
         >
           {s.bottomText}
@@ -121,10 +131,10 @@ export function ProductExplainerSection() {
 
         {/* CTA secundário */}
         <motion.div
-          initial={{ opacity: 0 }}
+          initial={{ opacity: shouldReduceMotion ? 1 : 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.4, delay: 0.3 }}
+          transition={{ duration: d(0.4), delay: d(0.3) }}
           className="mt-4 text-center"
         >
           <a

@@ -9,33 +9,38 @@
  * Bolhas aparecem com delay de 1.2s entre cada uma.
  * Mobile: empilhados verticalmente. Desktop: lado a lado.
  *
+ * prefers-reduced-motion: delay e duration zerados — todas as bolhas
+ * aparecem instantaneamente sem fade ou slide.
+ *
  * Arquitetura de referência:
  *   - contact_type='client'  + lara_mode='full' → Lara responde
  *   - contact_type='personal' + lara_mode='silent' → Lara silencia
  */
 
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import { strings } from '@/lib/strings'
 
 type Message = { from: string; text: string }
 
-function ChatBubble({
-  msg,
-  index,
-}: {
-  msg: Message
-  index: number
-}) {
-  const isLara      = msg.from === 'lara'
-  const isSystem    = msg.from === 'system'
-  const isClient    = msg.from === 'client' || msg.from === 'mae'
+function ChatBubble({ msg, index }: { msg: Message; index: number }) {
+  const shouldReduceMotion = useReducedMotion()
+
+  const isLara   = msg.from === 'lara'
+  const isSystem = msg.from === 'system'
+  const isClient = msg.from === 'client' || msg.from === 'mae'
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
+      initial={{
+        opacity: shouldReduceMotion ? 1 : 0,
+        y: shouldReduceMotion ? 0 : 10,
+      }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
-      transition={{ duration: 0.35, delay: index * 1.2 }}
+      transition={{
+        duration: shouldReduceMotion ? 0 : 0.35,
+        delay: shouldReduceMotion ? 0 : index * 1.2,
+      }}
       className={`flex ${isClient ? 'justify-start' : isLara ? 'justify-end' : 'justify-center'}`}
     >
       {isSystem ? (
@@ -68,7 +73,6 @@ function MockupPhone({
 }) {
   return (
     <div className="flex flex-col gap-2">
-      {/* Título do mockup */}
       <p
         className={`mb-1 text-xs font-semibold uppercase tracking-widest ${
           accentColor === 'rose' ? 'text-rose-500' : 'text-gray-400'
@@ -77,13 +81,13 @@ function MockupPhone({
         {title}
       </p>
 
-      {/* Frame do celular */}
       <div className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-md">
         {/* Barra de status simulada */}
         <div
           className={`flex items-center gap-2 px-4 py-3 ${
             accentColor === 'rose' ? 'bg-rose-500' : 'bg-gray-600'
           }`}
+          aria-hidden="true"
         >
           <div className="h-8 w-8 rounded-full bg-white/20" />
           <div>
@@ -93,7 +97,10 @@ function MockupPhone({
         </div>
 
         {/* Mensagens */}
-        <div className="flex flex-col gap-2.5 bg-[#ece5dd] p-4">
+        <div
+          className="flex flex-col gap-2.5 bg-[#ece5dd] p-4"
+          aria-label={`Conversa: ${title}`}
+        >
           {messages.map((msg, i) => (
             <ChatBubble key={i} msg={msg} index={i} />
           ))}
@@ -104,16 +111,17 @@ function MockupPhone({
 }
 
 export function DemoSection() {
+  const shouldReduceMotion = useReducedMotion()
   const s = strings.demo
 
   return (
     <section className="bg-gray-50 px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
       <div className="mx-auto max-w-4xl">
         <motion.h2
-          initial={{ opacity: 0, y: 16 }}
+          initial={{ opacity: shouldReduceMotion ? 1 : 0, y: 0 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.5 }}
+          transition={{ duration: shouldReduceMotion ? 0 : 0.5 }}
           className="mb-10 text-center text-2xl font-bold text-gray-900 sm:text-3xl"
         >
           Veja os dois comportamentos

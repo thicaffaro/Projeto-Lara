@@ -5,26 +5,39 @@
  * Proposta de valor principal da Lara.
  * Animação: fade + slide-up em sequência via Framer Motion.
  * Mobile-first (base 375px).
+ *
+ * prefers-reduced-motion: useReducedMotion() desativa fade/slide.
+ * Conteúdo aparece estático sem qualquer transformação.
  */
 
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import { strings } from '@/lib/strings'
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 24 },
-  visible: (delay: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.5, ease: 'easeOut', delay },
-  }),
-}
-
 export function HeroSection() {
+  const shouldReduceMotion = useReducedMotion()
   const s = strings.hero
+
+  // Variant definido dentro do componente para capturar shouldReduceMotion.
+  // Quando reduzido: y fixo em 0 (sem slide), duration 0 (sem fade progressivo).
+  const fadeUp = {
+    hidden: {
+      opacity: shouldReduceMotion ? 1 : 0,
+      y: 0,                              // nunca desliza, independente do modo
+    },
+    visible: (delay: number) => ({
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: shouldReduceMotion ? 0 : 0.5,
+        ease: 'easeOut',
+        delay: shouldReduceMotion ? 0 : delay,
+      },
+    }),
+  }
 
   return (
     <section className="relative overflow-hidden bg-white px-4 pb-16 pt-12 sm:px-6 sm:pt-16 lg:px-8 lg:pt-24">
-      {/* Gradiente decorativo de fundo */}
+      {/* Gradiente decorativo */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
@@ -81,7 +94,7 @@ export function HeroSection() {
             {s.cta}
           </a>
 
-          {/* Nota metodologia com asterisco */}
+          {/* Nota metodologia */}
           <p className="text-xs text-gray-400">
             {s.methodologyNote.text}{' '}
             <a

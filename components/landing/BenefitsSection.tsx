@@ -4,14 +4,18 @@
  * BenefitsSection.tsx
  * 3 cards de benefícios concretos da Lara.
  * Vocabulário: "sessão" (não "horário"), "protocolo" (não "serviço"), "cliente" para cliente final.
+ *
+ * prefers-reduced-motion: useReducedMotion() desativa fade/slide dos cards.
+ * Conteúdo aparece estático sem transformação.
  */
 
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import { strings } from '@/lib/strings'
 
 const ICONS = ['💬', '🔔', '🏠'] as const
 
 export function BenefitsSection() {
+  const shouldReduceMotion = useReducedMotion()
   const s = strings.benefits
   const cards = [s.notResponding, s.reminders, s.personalLifeStaysYours]
 
@@ -22,10 +26,17 @@ export function BenefitsSection() {
           {cards.map((card, i) => (
             <motion.div
               key={i}
-              initial={{ opacity: 0, y: 24 }}
+              initial={{
+                opacity: shouldReduceMotion ? 1 : 0,
+                y: shouldReduceMotion ? 0 : 24,
+              }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.45, ease: 'easeOut', delay: i * 0.1 }}
+              transition={{
+                duration: shouldReduceMotion ? 0 : 0.45,
+                ease: 'easeOut',
+                delay: shouldReduceMotion ? 0 : i * 0.1,
+              }}
               className="flex flex-col gap-3 rounded-2xl border border-gray-100 bg-gray-50 p-6"
             >
               <span className="text-2xl" aria-hidden="true">{ICONS[i]}</span>
