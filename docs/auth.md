@@ -177,6 +177,39 @@ sem precisar fazer query ao banco em cada request.
 
 ---
 
+## Fluxo de encerramento de todos os dispositivos
+
+Implementado em `/api/dashboard/auth/revoke-all-devices`:
+
+```
+Profissional acessa /dashboard/lara/security/revoke-devices
+  │
+  └── Confirma com PIN atual (bcrypt.compare)
+        │
+        ├── supabase.auth.admin.signOut(userId, 'global')
+        │     → Invalida TODOS os JWT access tokens e refresh tokens
+        │     → Próximo request de qualquer dispositivo: 401 Unauthorized
+        │
+        ├── INSERT recovery_tokens (purpose='reset_pin', expires em 1h)
+        │     → Token UUID único para criar novo PIN após o revoke
+        │
+        ├── Notificação WhatsApp via LARA_OFFICIAL_PHONE
+        │     "🔐 Todos os seus dispositivos foram desconectados... link para novo PIN"
+        │
+        └── audit_log (action='all_devices_revoked')
+```
+
+**O que NÃO é afetado pelo revoke:**
+- Conexão WhatsApp (Meta token separado de Supabase Auth)
+- Agendamentos e dados da conta
+- Lara continua respondendo mensagens de clientes
+- Magic links OTP existentes (Supabase OTP não é revogado pelo `signOut global`)
+
+**Próximo passo para a profissional:**
+Usar o link recebido no WhatsApp (`/auth/reset-pin?token=UUID`) para criar novo PIN.
+
+---
+
 ## Considerações de segurança
 
 | Regra | Implementação |
