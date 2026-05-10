@@ -5,33 +5,38 @@
  * Configura horários de atendimento por dia da semana.
  * Suporta múltiplas janelas por dia (ex: 9h-12h e 14h-18h).
  *
- * Salva em professionals.working_hours JSONB:
- * { "monday": [{"start":"09:00","end":"18:00"}], "tuesday": null, ... }
+ * Formato salvo em professionals.working_hours JSONB:
+ * { "1": [{"start":"09:00","end":"12:00"},{"start":"14:00","end":"18:00"}],
+ *   "2": [{"start":"09:00","end":"18:00"}],
+ *   "7": null }
+ *
+ * IMPORTANTE: chaves são ISO numéricas ('1'=Seg...'7'=Dom), compatíveis com
+ * TO_CHAR(timestamp,'ID') no PostgreSQL (is_slot_available).
+ * A UI exibe os nomes legíveis via WEEKDAY_LABELS.
  */
 
 import { useState } from 'react'
 import type { WorkingHours, WeekdayKey, TimeWindow } from '@/lib/onboarding-types'
-import { WEEKDAY_LABELS } from '@/lib/onboarding-types'
+import {
+  WEEKDAY_LABELS,
+  WEEKDAYS_ISO,
+  DEFAULT_TIME_WINDOW,
+  findOverlap,
+} from '@/lib/onboarding-types'
 
 interface WorkingHoursFormProps {
   initial: WorkingHours
   onSave: (hours: WorkingHours) => void
 }
 
-const WEEKDAYS: WeekdayKey[] = [
-  'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
-]
+// Dias em ordem ISO ('1'=Seg...'7'=Dom) — chaves do JSONB no banco
+const WEEKDAYS = WEEKDAYS_ISO
 
-const DEFAULT_WINDOW: TimeWindow = { start: '09:00', end: '18:00' }
+const DEFAULT_WINDOW: TimeWindow = DEFAULT_TIME_WINDOW
 
-// Verifica se janelas se sobrepõem
+// Delega para findOverlap de /lib/working-hours.ts
 function hasOverlap(windows: TimeWindow[]): boolean {
-  if (windows.length < 2) return false
-  const sorted = [...windows].sort((a, b) => a.start.localeCompare(b.start))
-  for (let i = 0; i < sorted.length - 1; i++) {
-    if (sorted[i].end > sorted[i + 1].start) return true
-  }
-  return false
+  return findOverlap(windows) !== null
 }
 
 // ── Sub-componente: linha de janela de horário ────────────────────────────────

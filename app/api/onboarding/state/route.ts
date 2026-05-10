@@ -100,7 +100,12 @@ export async function PATCH(req: NextRequest): Promise<NextResponse> {
   }
 
   // ── Se onboarding_completed=true, atualiza user_metadata no Supabase Auth ─
-  // Permite que o middleware leia onboarding_completed sem query ao banco
+  // Permite que o middleware leia onboarding_completed sem query ao banco.
+  // IMPORTANTE: o JWT da sessão atual ainda tem onboarding_completed=false
+  // até o cliente chamar supabase.auth.refreshSession().
+  // Sinalizado via refreshSession:true na resposta para o cliente fazer o refresh.
+  let shouldRefreshSession = false
+
   if (professionals?.onboarding_completed === true) {
     const { data: prof } = await supabase
       .from('professionals')
@@ -109,13 +114,18 @@ export async function PATCH(req: NextRequest): Promise<NextResponse> {
       .single()
 
     if (prof?.auth_user_id) {
-      await supabase.auth.admin.updateUserById(prof.auth_user_id, {
-        user_metadata: { onboarding_completed: true },
-      }).catch((e: { message?: string }) =>
-        console.error('[onboarding/state] updateUserById falhou:', e?.message)
+      const { error: updateErr } = await supabase.auth.admin.updateUserById(
+        prof.auth_user_id,
+        { user_metadata: { onboarding_completed: true } },
       )
+      if (updateErr) {
+        console.error('[onboarding/state] updateUserById falhou:', updateErr.message)
+      } else {
+        // Sinaliza ao cliente para fazer refreshSession() antes de navegar
+        shouldRefreshSession = true
+      }
     }
   }
 
-  return NextResponse.json({ ok: true, step }, { status: 200 })
+  return NextResponse.json({ ok: true, step, refreshSession: shouldRefreshSession }, { status: 200 })
 }

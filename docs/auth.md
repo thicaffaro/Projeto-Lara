@@ -123,10 +123,34 @@ A coluna `professionals.recovery_email` (TEXT NULL) armazena o email real
 da profissional para fluxos de recuperação de PIN e reconexão Meta.
 
 **Fluxo:** Passo 6 do onboarding (`/components/forms/RecoveryEmailForm.tsx`).
-**Componente:** `/components/forms/RecoveryEmailForm.tsx` ✓ implementado.
 
 Se pulado no onboarding, pode ser configurado depois em `/dashboard/lara/security`.
 Até configurar, recuperação de acesso é feita pelo suporte via `wa.me/5511978663056`.
+
+### Política de unicidade do recovery_email
+
+**Decisão: recovery_email NÃO tem constraint UNIQUE.**
+
+**Justificativa:** Emails familiares compartilhados são um caso real e legítimo
+(ex: mãe e filha esteticistas usando o mesmo email de casa). Forçar unicidade
+criaria fricção desnecessária neste cenário.
+
+**Como a ambiguidade é resolvida com segurança:**
+- Cada link de recuperação contém um `token` UUID único (tabela `recovery_tokens`)
+- O `token` identifica **qual conta** deve ser resetada, não o email
+- Ambas as profissionais recebem o link por email, mas cada link só atua na conta correta
+- O token expira após uso (`used_at` preenchido) e tem `expires_at`
+
+```sql
+-- recovery_tokens
+-- token UUID → professional_id específico → uma conta específica
+SELECT purpose, expires_at, used_at
+FROM recovery_tokens
+WHERE professional_id = $1 AND token = $2;
+```
+
+**O que NÃO implementar:** `UNIQUE (recovery_email)` — geraria erro
+"e-mail já em uso" para casos legítimos de família.
 
 ---
 

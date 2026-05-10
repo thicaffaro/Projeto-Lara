@@ -11,7 +11,7 @@
 
 import { useState } from 'react'
 import type { ServiceAreas, WeekdayKey } from '@/lib/onboarding-types'
-import { WEEKDAY_LABELS } from '@/lib/onboarding-types'
+import { WEEKDAY_LABELS, WEEKDAYS_ISO } from '@/lib/onboarding-types'
 
 interface ServiceAreasFormProps {
   initial: { enabled: boolean; areas: ServiceAreas }
@@ -20,9 +20,8 @@ interface ServiceAreasFormProps {
   onSkip: () => void
 }
 
-const WEEKDAYS: WeekdayKey[] = [
-  'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
-]
+// Usa chaves ISO ('1'-'7') — mesmas usadas em working_hours
+const WEEKDAYS = WEEKDAYS_ISO
 
 export function ServiceAreasForm({ initial, workingHours, onSave, onSkip }: ServiceAreasFormProps) {
   const [enabled, setEnabled] = useState(initial.enabled)

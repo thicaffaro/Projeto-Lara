@@ -2,9 +2,31 @@
  * /lib/onboarding-types.ts
  * Tipos compartilhados do onboarding de 7 passos.
  * Usados por SetupStepper, API routes e forms individuais.
+ *
+ * FORMATO working_hours:
+ *   Chaves ISO numéricas ('1'=Segunda...'7'=Domingo) compatíveis com
+ *   TO_CHAR(timestamp, 'ID') em is_slot_available (Postgres).
+ *   Valor: array de TimeWindow ou null (dia fechado).
+ *   Ver /lib/working-hours.ts para helpers de conversão e serialização.
  */
 
-// ── Tipos de endereço e horários ──────────────────────────────────────────────
+// Re-exporta tipos canônicos de /lib/working-hours.ts para uso nos forms
+export type {
+  WeekdayISO as WeekdayKey,
+  TimeWindow,
+  WorkingHoursISO as WorkingHours,
+} from './working-hours'
+
+export {
+  ISO_WEEKDAYS as WEEKDAYS_ISO,
+  WEEKDAY_LABELS,
+  DEFAULT_TIME_WINDOW,
+  findOverlap,
+  serializeWorkingHours,
+  deserializeWorkingHours,
+} from './working-hours'
+
+// ── Tipos de endereço ──────────────────────────────────────────────────────────
 
 export interface StudioAddress {
   street: string
@@ -18,38 +40,13 @@ export interface StudioAddress {
   lng?: number
 }
 
-export interface TimeWindow {
-  start: string // "09:00"
-  end: string   // "18:00"
-}
-
-/** ISO weekday names (usados em working_hours e service_areas JSONB) */
-export type WeekdayKey =
-  | 'monday' | 'tuesday' | 'wednesday' | 'thursday'
-  | 'friday' | 'saturday' | 'sunday'
-
-export const WEEKDAY_LABELS: Record<WeekdayKey, string> = {
-  monday:    'Segunda-feira',
-  tuesday:   'Terça-feira',
-  wednesday: 'Quarta-feira',
-  thursday:  'Quinta-feira',
-  friday:    'Sexta-feira',
-  saturday:  'Sábado',
-  sunday:    'Domingo',
-}
-
-/**
- * Estrutura de horários de atendimento.
- * Suporta múltiplas janelas por dia (ex: 9h-12h e 14h-18h).
- * null = dia fechado.
- */
-export type WorkingHours = Partial<Record<WeekdayKey, TimeWindow[] | null>>
-
 /**
  * Áreas de atendimento por dia (apenas mode='home').
+ * Usa as mesmas chaves ISO que working_hours.
  * null = sem restrição de região nos dias disponíveis.
  */
-export type ServiceAreas = Partial<Record<WeekdayKey, string[]>>
+import type { WeekdayISO } from './working-hours'
+export type ServiceAreas = Partial<Record<WeekdayISO, string[]>>
 
 // ── Tipos de protocolo e contato ──────────────────────────────────────────────
 

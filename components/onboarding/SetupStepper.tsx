@@ -18,10 +18,18 @@
  *
  * Passo 3 (service_areas) é pulado automaticamente em modo='studio'.
  * "Voltar" preserva o estado sem re-requisitar o banco.
+ *
+ * JWT REFRESH (Ajuste 3):
+ * Após o passo 7 (onboarding_completed=true), a API atualiza user_metadata no
+ * Supabase Auth. O JWT atual ainda tem onboarding_completed=false. Ao receber
+ * refreshSession:true na resposta, chamamos supabase.auth.refreshSession()
+ * antes de navegar para /complete — garante que o middleware não redirecionará
+ * de volta para /onboarding/setup.
  */
 
 import { useReducer, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { createBrowserClient } from '@supabase/ssr'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import {
   setupReducer,
@@ -227,12 +235,30 @@ export function SetupStepper({ professionalId, initialState }: SetupStepperProps
     const allOk = testResults.every(r => r.passed === true || (r.passed === false && r.warning))
     if (!allOk) return // botão de conclusão só aparece quando allDone
 
-    await persistStep({
-      professionalId,
-      step: 6,
-      professionals: { onboarding_completed: true },
-      auditEvent: 'onboarding_completed',
+    const res = await fetch('/api/onboarding/state', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        professionalId,
+        step: 6,
+        professionals: { onboarding_completed: true },
+        auditEvent: 'onboarding_completed',
+      }),
     })
+
+    const json = await res.json().catch(() => ({}))
+
+    // CRÍTICO: refrescar JWT antes de navegar para /complete.
+    // Sem isso, o middleware lê onboarding_completed=false do JWT antigo
+    // e redireciona de volta para /onboarding/setup (loop infinito).
+    if (json.refreshSession) {
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      )
+      await supabase.auth.refreshSession()
+    }
+
     router.push('/onboarding/setup/complete')
   }
 
