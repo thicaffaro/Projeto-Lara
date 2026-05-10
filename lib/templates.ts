@@ -20,7 +20,34 @@
 
 import { createAdminClient } from './supabase/admin'
 import { decryptToken } from './crypto'
-import { graphRequest, WhatsAppApiError, sendTextMessage } from './whatsapp'
+import { graphRequest, WhatsAppApiError, sendTextMessage, sendFromOfficialNumber } from './whatsapp'
+
+// ── Templates obrigatórios por service_mode ──────────────────────────────────
+//
+// studio: home_visit_confirmation NÃO é necessário (profissional não vai ao domicílio)
+// home:   home_visit_confirmation É obrigatório
+//
+// Threshold: 80% dos obrigatórios precisam ter ≥1 variante approved para iniciar trial.
+//   studio: ceil(5 × 0.80) = 4 de 5
+//   home:   ceil(6 × 0.80) = 5 de 6
+
+export const REQUIRED_TEMPLATES_BY_MODE: Record<'studio' | 'home', readonly TemplateName[]> = {
+  studio: [
+    'booking_confirmation',
+    'reminder_24h',
+    'reminder_2h',
+    'cancellation',
+    'reschedule_request',
+  ],
+  home: [
+    'booking_confirmation',
+    'reminder_24h',
+    'reminder_2h',
+    'cancellation',
+    'reschedule_request',
+    'home_visit_confirmation',
+  ],
+} as const
 
 // ── Tipos exportados ──────────────────────────────────────────────────────────
 
@@ -337,7 +364,7 @@ async function submitSingleTemplate(
   }
 
   try {
-    const response = await graphRequest<{ id: string }>(
+    const { data } = await graphRequest<{ id: string }>(
       `/${wabaId}/message_templates`,
       { method: 'POST', token: accessToken, body: payload },
       professionalId,
@@ -346,7 +373,7 @@ async function submitSingleTemplate(
     return {
       template,
       success: true,
-      metaTemplateId: response.id,
+      metaTemplateId: data.id,
     }
 
   } catch (err) {
@@ -356,14 +383,20 @@ async function submitSingleTemplate(
 
     // ── Retry em 429 (rate limit) ─────────────────────────────────────────
     if (err.code === 429 && attempt < MAX_RETRIES) {
-      // Tenta respeitar Retry-After se disponível (vem como string no erro)
-      // O graphRequest não expõe headers, então usa backoff fixo
-      const backoffMs = BACKOFF_BASE_MS * Math.pow(2, attempt) // 2s, 4s, 8s
+      // Prioridade: Retry-After exato da Meta (em segundos via err.retryAfter)
+      // Fallback: backoff exponencial 2s → 4s → 8s
+      // CRÍTICO: ignorar Retry-After pode resultar em ban do WABA
+      const retryAfterMs = err.retryAfter != null
+        ? err.retryAfter * 1000
+        : BACKOFF_BASE_MS * Math.pow(2, attempt)
+
       console.warn(
         `[templates] Rate limit Meta (429) para ${template.metaName} — `
-        + `aguardando ${backoffMs / 1000}s (tentativa ${attempt + 1}/${MAX_RETRIES})`
+        + `aguardando ${retryAfterMs / 1000}s `
+        + `(${err.retryAfter != null ? 'Retry-After da Meta' : 'backoff exponencial'})`
+        + ` tentativa ${attempt + 1}/${MAX_RETRIES}`
       )
-      await sleep(backoffMs)
+      await sleep(retryAfterMs)
       return submitSingleTemplate(template, accessToken, wabaId, professionalId, attempt + 1)
     }
 
@@ -466,16 +499,38 @@ export async function sendTemplate(
   )
 
   if (!chosen) {
-    // Nenhuma variante aprovada — logar em audit_log
+    // Nenhuma variante aprovada — logar em audit_log e notificar equipe de ops
     await supabase.from('audit_log').insert({
       professional_id: professionalId,
       actor: 'system',
-      action: 'template_send_no_approved_variant',
+      action: 'template_no_variant_available',
       table_name: 'templates',
       new_data: { template_name: templateName, to: toPhoneNumber.slice(-4) + '****' },
     }).catch((e: Error) =>
       console.error('[templates] audit_log INSERT falhou:', e.message)
     )
+
+    // Notifica equipe ops via número oficial Lara
+    // LARA_OPS_PHONE: número do grupo/agente de ops (default: LARA_OFFICIAL_PHONE)
+    const opsPhone = process.env.LARA_OPS_PHONE ?? process.env.LARA_OFFICIAL_PHONE ?? ''
+    if (opsPhone) {
+      // Busca nome da profissional para a mensagem de alerta
+      const { data: prof } = await supabase
+        .from('professionals')
+        .select('name, phone_number')
+        .eq('id', professionalId)
+        .single()
+
+      const profName = prof?.name ?? `ID ${professionalId}`
+      sendFromOfficialNumber(
+        opsPhone,
+        `⚠️ Profissional ${profName} não tem variante aprovada para o template "${templateName}". `
+        + `Verificar em /admin/ops/templates.`,
+      ).catch((e: Error) =>
+        console.error('[templates] Falha ao notificar ops sobre no_variant_available:', e.message)
+      )
+    }
+
     return { ok: false, error: 'no_approved_variant' }
   }
 
@@ -730,40 +785,61 @@ export async function handleTemplateStatusUpdate(
 // ── maybeStartTrial ───────────────────────────────────────────────────────────
 
 /**
- * Inicia o trial se 4 nomes de template distintos tiverem ≥1 variante approved.
+ * Inicia o trial quando 80% dos templates obrigatórios para o service_mode
+ * da profissional têm ≥1 variante approved.
+ *
+ * Regras por service_mode:
+ *   studio: 4 de 5 obrigatórios (home_visit_confirmation ignorado)
+ *   home:   5 de 6 obrigatórios (home_visit_confirmation incluído)
+ *
+ * Contagem:
+ *   SQL filtra por (professional_id, status='approved', name IN obrigatórios)
+ *   Set elimina duplicatas de nome — garante COUNT(DISTINCT name)
+ *   Threshold = ceil(total_obrigatórios × 0.80)
+ *
  * Idempotente: só atua se trial_started_at ainda for NULL.
  */
 async function maybeStartTrial(professionalId: string): Promise<void> {
   const supabase = createAdminClient()
 
-  // Conta nomes distintos com variante approved
-  const { data: approvedNames, error: countError } = await supabase
+  // ── 1. Busca professional para service_mode + idempotência ────────────────
+  const { data: professional, error: profError } = await supabase
+    .from('professionals')
+    .select('trial_started_at, phone_number, name, service_mode')
+    .eq('id', professionalId)
+    .single()
+
+  if (profError || !professional) return
+
+  // Idempotência: trial já iniciado
+  if (professional.trial_started_at) return
+
+  // ── 2. Determina templates obrigatórios e threshold para este service_mode ─
+  const mode = (professional.service_mode ?? 'studio') as 'studio' | 'home'
+  const requiredNames = REQUIRED_TEMPLATES_BY_MODE[mode]
+  const threshold = Math.ceil(requiredNames.length * 0.8)
+  // studio: ceil(5 × 0.80) = 4    home: ceil(6 × 0.80) = 5
+
+  // ── 3. Conta nomes distintos aprovados dentro dos obrigatórios ────────────
+  // Equivale a: SELECT COUNT(DISTINCT name) FROM templates
+  //             WHERE professional_id=$1 AND status='approved' AND name=ANY($2)
+  const { data: approvedRows, error: countError } = await supabase
     .from('templates')
     .select('name')
     .eq('professional_id', professionalId)
     .eq('status', 'approved')
+    .in('name', requiredNames as unknown as string[])
 
-  if (countError || !approvedNames) return
+  if (countError || !approvedRows) return
 
-  const distinctApprovedNames = new Set(approvedNames.map(t => t.name))
+  // Set deduplica: booking_confirmation com variantes A+B aprovadas conta como 1
+  const distinctApprovedCount = new Set(approvedRows.map(t => t.name)).size
 
-  if (distinctApprovedNames.size < 4) {
+  if (distinctApprovedCount < threshold) {
     console.log(
-      `[templates] Trial não iniciado — apenas ${distinctApprovedNames.size}/4 nomes aprovados`
-      + ` para professional: ${professionalId}`
+      `[templates] Trial não elegível — ${distinctApprovedCount}/${threshold} `
+      + `nomes aprovados (mode=${mode}) — professional: ${professionalId}`
     )
-    return
-  }
-
-  // Verifica se trial já foi iniciado (idempotência)
-  const { data: professional } = await supabase
-    .from('professionals')
-    .select('trial_started_at, phone_number, name')
-    .eq('id', professionalId)
-    .single()
-
-  if (professional?.trial_started_at) {
-    // Trial já em andamento — não reiniciar
     return
   }
 
@@ -793,12 +869,12 @@ async function maybeStartTrial(professionalId: string): Promise<void> {
 
   console.log(
     `[templates] Trial iniciado — professional: ${professionalId}, `
+    + `mode: ${mode}, threshold: ${distinctApprovedCount}/${threshold}, `
     + `ends_at: ${trialEndsAt.toISOString()}`
   )
 
   // ── Notifica profissional via número oficial Lara ─────────────────────────
   if (professional) {
-    const { sendFromOfficialNumber } = await import('./whatsapp')
     try {
       await sendFromOfficialNumber(
         professional.phone_number,

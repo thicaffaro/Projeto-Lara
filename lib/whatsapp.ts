@@ -35,11 +35,27 @@ export interface GraphError {
   fbtrace_id?: string
 }
 
+/**
+ * Resposta completa da Graph API, expondo headers para leitura de Retry-After.
+ * Erros ainda lançam WhatsAppApiError — este tipo só é retornado em sucesso.
+ */
+export interface GraphResponse<T> {
+  data: T
+  headers: Headers
+  status: number
+}
+
 export class WhatsAppApiError extends Error {
   constructor(
     message: string,
     public readonly code: number,
     public readonly isTokenInvalid: boolean,
+    /**
+     * Valor do header Retry-After em segundos (presente em respostas 429).
+     * Usar para aguardar exatamente o tempo indicado pela Meta antes de retentar.
+     * Se ausente, usar backoff exponencial como fallback.
+     */
+    public readonly retryAfter?: number,
   ) {
     super(message)
     this.name = 'WhatsAppApiError'
@@ -56,18 +72,21 @@ interface GraphRequestOptions {
 }
 
 /**
- * Faz uma requisição à Graph API.
- * Em toda chamada, detecta OAuthException code=190 e aciona tratamento.
+ * Faz uma requisição à Graph API e retorna GraphResponse<T> com headers.
  *
- * @param path     - Caminho relativo ao endpoint (ex: "/123456/messages")
- * @param options  - Método, token e body
+ * Em toda chamada:
+ * - Detecta OAuthException code=190 → aciona handleTokenInvalid
+ * - Captura Retry-After em 429 e inclui em WhatsAppApiError.retryAfter
+ *
+ * @param path           - Caminho relativo ao endpoint (ex: "/123456/messages")
+ * @param options        - Método, token e body
  * @param professionalId - Necessário para acionar tratamento de token_invalid
  */
 export async function graphRequest<T = unknown>(
   path: string,
   options: GraphRequestOptions,
   professionalId?: string,
-): Promise<T> {
+): Promise<GraphResponse<T>> {
   const { method = 'GET', token, body, timeoutMs = 10_000 } = options
 
   const url = `${GRAPH_BASE}${path}`
@@ -114,6 +133,18 @@ export async function graphRequest<T = unknown>(
       )
     }
 
+    // 429 — captura Retry-After para repassar ao caller (crítico para WABA ban prevention)
+    if (code === 429) {
+      const retryAfterHeader = response.headers.get('Retry-After')
+      const retryAfterSecs = retryAfterHeader ? parseInt(retryAfterHeader, 10) : undefined
+      throw new WhatsAppApiError(
+        'Rate limit Meta (429) — aguardar Retry-After antes de retentar',
+        429,
+        false,
+        retryAfterSecs,
+      )
+    }
+
     // Outros erros — sem expor detalhes internos
     const safeMsg = graphErr?.message
       ? `Graph API error ${code}: ${graphErr.message}`
@@ -122,7 +153,7 @@ export async function graphRequest<T = unknown>(
     throw new WhatsAppApiError(safeMsg, code, false)
   }
 
-  return json as T
+  return { data: json as T, headers: response.headers, status: response.status }
 }
 
 // ── Tratamento de token inválido ──────────────────────────────────────────────
