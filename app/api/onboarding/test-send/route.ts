@@ -65,7 +65,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         actor: 'system',
         action: 'onboarding_test_message_failed',
         new_data: { error: msg },
-      }).catch(() => {})
+      }).then(null, () => {})
 
       return NextResponse.json({ ok: false, error: msg }, { status: 502 })
     }

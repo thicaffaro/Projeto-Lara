@@ -97,7 +97,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Falha ao proteger credenciais. Tente novamente.' }, { status: 500 })
   } finally {
     // Zerar variável — JS não garante coleta imediata mas documenta a intenção
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(longLivedToken as any) = null
   }
 

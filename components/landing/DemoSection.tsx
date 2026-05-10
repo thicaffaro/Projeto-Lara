@@ -68,7 +68,7 @@ function MockupPhone({
   accentColor,
 }: {
   title: string
-  messages: Message[]
+  messages: readonly Message[]
   accentColor: 'rose' | 'gray'
 }) {
   return (

@@ -329,7 +329,6 @@ export async function submitAllTemplates(
   }
 
   // Zera token após uso
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ;(accessToken as any) = null
 
   return results
@@ -422,7 +421,6 @@ async function persistTemplateResult(
   template: TemplateDefinition,
   result: SubmitResult,
   professionalId: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
 ): Promise<void> {
   const now = new Date().toISOString()
@@ -506,7 +504,7 @@ export async function sendTemplate(
       action: 'template_no_variant_available',
       table_name: 'templates',
       new_data: { template_name: templateName, to: toPhoneNumber.slice(-4) + '****' },
-    }).catch((e: Error) =>
+    }).then(null, (e: Error) =>
       console.error('[templates] audit_log INSERT falhou:', e.message)
     )
 
@@ -586,7 +584,6 @@ export async function sendTemplate(
     const msg = err instanceof WhatsAppApiError ? err.message : 'Erro ao enviar template'
     return { ok: false, error: 'graph_api_error', message: msg }
   } finally {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(accessToken as any) = null
   }
 }
@@ -663,7 +660,6 @@ export async function sendMessageWithFallback(
       const msg = err instanceof Error ? err.message : 'Erro ao enviar texto'
       return { ok: false, method: 'failed', error: msg }
     } finally {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ;(accessToken as any) = null
     }
   }
@@ -685,7 +681,7 @@ export async function sendMessageWithFallback(
         contact_id: contactId,
         note: 'Janela 24h expirada e nenhuma variante aprovada disponível',
       },
-    }).catch((e: Error) =>
+    }).then(null, (e: Error) =>
       console.error('[templates] audit_log INSERT falhou:', e.message)
     )
     return { ok: false, method: 'failed', error: 'cannot_send_outside_window' }

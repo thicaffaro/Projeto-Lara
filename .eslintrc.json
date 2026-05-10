@@ -1,7 +1,8 @@
 {
   "extends": ["next/core-web-vitals"],
   "rules": {
-    "@typescript-eslint/no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
-    "@typescript-eslint/no-explicit-any": "warn"
+    // @typescript-eslint rules removidas — plugin não instalado.
+    // Serão restauradas no Prompt E junto com setup completo de CI
+    // (@typescript-eslint/eslint-plugin + @typescript-eslint/parser).
   }
 }

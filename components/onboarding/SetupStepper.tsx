@@ -153,7 +153,13 @@ export function SetupStepper({ professionalId, initialState }: SetupStepperProps
     homeRadiusKm?: number
     homeBufferMin?: number
   }) {
-    dispatch({ type: 'SET_SERVICE_MODE', ...data })
+    dispatch({
+      type:      'SET_SERVICE_MODE',
+      mode:      data.serviceMode,
+      address:   data.studioAddress,
+      radiusKm:  data.homeRadiusKm,
+      bufferMin: data.homeBufferMin,
+    })
     await persistStep({
       professionalId,
       step: 0,

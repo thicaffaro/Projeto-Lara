@@ -69,7 +69,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: msg }, { status: 502 })
   } finally {
     // Zera referência local do token
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(accessToken as any) = null
   }
 

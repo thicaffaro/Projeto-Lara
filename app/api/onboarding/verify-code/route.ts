@@ -141,7 +141,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     console.error('[verify-code] Erro:', msg, 'professional:', professionalId)
     return NextResponse.json({ error: msg }, { status: 502 })
   } finally {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(accessToken as any) = null
   }
 }

@@ -15,6 +15,7 @@ import { cookies } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
 import { SetupStepper } from '@/components/onboarding/SetupStepper'
 import type { SetupState } from '@/lib/onboarding-types'
+import type { ProfessionalRow } from '@/lib/supabase/types-stub'
 
 export default async function OnboardingSetupPage() {
   const cookieStore = await cookies()
@@ -37,24 +38,19 @@ export default async function OnboardingSetupPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/cadastro')
 
-  // Busca estado atual do profissional para inicializar o stepper
-  const { data: professional } = await supabase
+  // Busca estado atual do profissional para inicializar o stepper.
+  // Cast para ProfessionalRow (types-stub) — será substituído por tipos gerados no Prompt E.
+  const { data: rawProfessional } = await supabase
     .from('professionals')
-    .select([
-      'id',
-      'onboarding_completed',
-      'service_mode',
-      'studio_address',
-      'home_service_radius_km',
-      'home_service_buffer_min',
-      'working_hours',
-      'service_areas',
-      'protocols',
-      'default_lara_mode',
-      'recovery_email',
-    ].join(', '))
+    .select(
+      'id, onboarding_completed, service_mode, studio_address, ' +
+      'home_service_radius_km, home_service_buffer_min, working_hours, ' +
+      'service_areas, protocols, default_lara_mode, recovery_email'
+    )
     .eq('auth_user_id', user.id)
     .single()
+
+  const professional = rawProfessional as unknown as ProfessionalRow | null
 
   if (!professional) redirect('/cadastro')
   if (professional.onboarding_completed) redirect('/dashboard')
@@ -67,10 +63,13 @@ export default async function OnboardingSetupPage() {
     .eq('pre_registered', true)
     .in('contact_type', ['personal', 'business'])
 
+  // Importamos StudioAddress para o cast abaixo
+  type SA = import('@/lib/onboarding-types').StudioAddress
+
   // Mapeia estado do banco para o formato do SetupStepper
   const initialState: Partial<SetupState> = {
     serviceMode:           professional.service_mode ?? null,
-    studioAddress:         professional.studio_address ?? null,
+    studioAddress:         (professional.studio_address ?? null) as SA | null,
     homeRadiusKm:          professional.home_service_radius_km ?? 15,
     homeBufferMin:         professional.home_service_buffer_min ?? 30,
     workingHours:          professional.working_hours ?? {},
@@ -79,13 +78,13 @@ export default async function OnboardingSetupPage() {
     protocols:             professional.protocols ?? [],
     defaultLaraMode:       professional.default_lara_mode ?? 'cautious',
     preRegisteredContacts: (preContacts ?? []).map(c => ({
-      name: c.name ?? '',
-      phone_number: c.phone_number,
-      contact_type: c.contact_type as 'personal' | 'business',
+      name: (c as unknown as { name: string | null }).name ?? '',
+      phone_number: (c as unknown as { phone_number: string }).phone_number,
+      contact_type: (c as unknown as { contact_type: string }).contact_type as 'personal' | 'business',
     })),
     recoveryEmail: '',
     // currentStep é determinado pelo progresso atual
-    currentStep: deriveCurrentStep(professional),
+    currentStep: deriveCurrentStep(professional as unknown as Record<string, unknown>),
   }
 
   return (

@@ -91,7 +91,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     console.error('[reconnect] Falha na criptografia — professional:', professionalId)
     return NextResponse.json({ error: 'Falha ao proteger credenciais.' }, { status: 500 })
   } finally {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(longLivedToken as any) = null
   }
 

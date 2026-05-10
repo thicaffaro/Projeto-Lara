@@ -94,7 +94,7 @@ export async function PATCH(req: NextRequest): Promise<NextResponse> {
       actor: 'professional',
       action: auditEvent,
       new_data: { step },
-    }).catch((e: Error) =>
+    }).then(null, (e: Error) =>
       console.error('[onboarding/state] audit_log falhou:', e.message)
     )
   }
