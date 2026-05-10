@@ -10,9 +10,27 @@
  */
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { PinInput } from '@/components/dashboard/PinInput'
 import { validatePin } from '@/lib/security/blocked-pins'
+
+/**
+ * Constrói a mensagem de erro progressivo de rate limit.
+ * Especificação:
+ *   remaining=2 → "PIN incorreto. 2 tentativas restantes."
+ *   remaining=1 → "PIN incorreto. 1 tentativa restante. Próximo erro causará bloqueio de 1 hora."
+ *   remaining=0 → "Use 'Esqueci meu PIN'."  (já bloqueado — tratado em estado blocked)
+ */
+function buildRateLimitMessage(remaining: number): string {
+  if (remaining === 0) {
+    return 'Use "Esqueci meu PIN" para recuperar o acesso.'
+  }
+  if (remaining === 1) {
+    return `PIN incorreto. 1 tentativa restante. Próximo erro causará bloqueio de 1 hora.`
+  }
+  return `PIN incorreto. ${remaining} tentativas restantes.`
+}
 
 interface Props {
   hasExistingPin: boolean
@@ -40,17 +58,20 @@ const STEP_META: Record<Step, { label: string; description: string }> = {
 }
 
 export function ChangePinForm({ hasExistingPin }: Props) {
-  const router  = useRouter()
+  // useRouter mantido para redirect futuro se necessário
+  const _router = useRouter()
   const steps   = hasExistingPin ? STEPS_WITH_PIN : STEPS_WITHOUT_PIN
   const totalSteps = steps.length
 
-  const [stepIndex, setStepIndex] = useState(0)
-  const [pins, setPins]           = useState<Record<Step, string>>({
+  const [stepIndex,  setStepIndex]  = useState(0)
+  const [pins,       setPins]       = useState<Record<Step, string>>({
     current: '', new: '', confirm: '',
   })
-  const [error, setError]   = useState<string>()
+  const [error,   setError]   = useState<string>()
   const [loading, setLoading] = useState(false)
   const [blocked, setBlocked] = useState(false)
+  /** true após troca bem-sucedida — exibe tela de confirmação */
+  const [success, setSuccess] = useState(false)
 
   const currentStep = steps[stepIndex]
   const meta        = STEP_META[currentStep]
@@ -125,24 +146,47 @@ export function ChangePinForm({ hasExistingPin }: Props) {
           return
         }
         if (json.error === 'invalid_current_pin') {
-          // Volta para etapa 1 para tentar novamente
+          // Volta para etapa 1 — mensagem progressiva conforme tentativas restantes
           setStepIndex(0)
           setPins(prev => ({ ...prev, current: '' }))
-          const remaining = json.remaining ?? 0
-          setError(`PIN incorreto. ${remaining > 0 ? `${remaining} tentativa(s) restante(s).` : 'Use "Esqueci meu PIN".'}`)
+          setError(buildRateLimitMessage(json.remaining ?? 0))
           return
         }
         setError(json.error ?? 'Erro ao trocar PIN. Tente novamente.')
         return
       }
 
-      // Sucesso
-      router.push('/dashboard/lara/security?pin_changed=1')
+      // Sucesso — mostra tela de confirmação (não redireciona imediatamente)
+      setSuccess(true)
     } catch {
       setError('Erro de rede. Tente novamente.')
     } finally {
       setLoading(false)
     }
+  }
+
+  // ── Render sucesso ────────────────────────────────────────────────────────
+  // Confirmação visual antes de voltar — cumpre V1: "PIN alterado com sucesso!"
+  if (success) {
+    return (
+      <div className="rounded-2xl border border-green-200 bg-green-50 p-8 text-center space-y-4">
+        <p className="text-4xl" aria-hidden="true">✅</p>
+        <div>
+          <p className="text-base font-bold text-green-800">
+            {hasExistingPin ? 'PIN alterado com sucesso!' : 'PIN criado com sucesso!'}
+          </p>
+          <p className="mt-1 text-sm text-green-700">
+            Você receberá uma confirmação no WhatsApp.
+          </p>
+        </div>
+        <Link
+          href="/dashboard/lara/security"
+          className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-green-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-green-700"
+        >
+          Voltar para Segurança
+        </Link>
+      </div>
+    )
   }
 
   // ── Render bloqueado ──────────────────────────────────────────────────────

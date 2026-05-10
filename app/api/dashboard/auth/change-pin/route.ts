@@ -92,7 +92,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json(
       {
         error: 'blocked',
-        message: `Muitas tentativas incorretas. Tente novamente em ${minutes} minuto(s) ou use "Esqueci meu PIN".`,
+        // Mensagem conforme especificação: "Você está temporariamente bloqueado…"
+        message: `Você está temporariamente bloqueado. Tente novamente em ${minutes} minuto(s) ou use "Esqueci meu PIN".`,
         ttlMinutes: minutes,
       },
       { status: 429 }
@@ -120,7 +121,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         return NextResponse.json(
           {
             error: 'blocked',
-            message: 'Muitas tentativas incorretas. Conta bloqueada por 1 hora. Use "Esqueci meu PIN".',
+            // Mensagem conforme especificação: bloqueio acabou de ocorrer
+            message: 'Muitas tentativas erradas. Bloqueado por 1 hora. Use "Esqueci meu PIN" se precisar acessar agora.',
           },
           { status: 429 }
         )
@@ -129,8 +131,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json(
         {
           error: 'invalid_current_pin',
-          // Não revelar quantas tentativas restam se for inseguro
-          remaining: rateAfter.remaining,
+          remaining: rateAfter.remaining, // 2 → primeiro erro, 1 → penúltimo, 0 → já bloqueado
         },
         { status: 401 }
       )
