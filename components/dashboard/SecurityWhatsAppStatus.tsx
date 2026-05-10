@@ -62,23 +62,49 @@ export function SecurityWhatsAppStatus({ initialStatus, initialChangedAt }: Prop
     changedAt: initialChangedAt,
   })
 
-  // Auto-refresh a cada 30s
+  // Auto-refresh a cada 30s com pausa quando aba está em background.
+  // Previne ~1440 req/h desnecessárias quando esteticista esquece o dashboard aberto.
+  // Padrão a ser replicado em outros componentes com polling (ex: aba Conversas no Prompt D).
   useEffect(() => {
-    const interval = setInterval(async () => {
+    let intervalId: ReturnType<typeof setInterval> | null = null
+
+    async function fetchStatus() {
       try {
         const res = await fetch('/api/dashboard/security/whatsapp-status', {
           cache: 'no-store',
         })
-        if (res.ok) {
-          const json = await res.json() as StatusData
-          setData(json)
-        }
+        if (res.ok) setData(await res.json() as StatusData)
       } catch {
         // Falha silenciosa — não interrompe o UX
       }
-    }, 30_000)
+    }
 
-    return () => clearInterval(interval)
+    function startPolling() {
+      fetchStatus()                                      // fetch imediato ao ganhar foco
+      intervalId = setInterval(fetchStatus, 30_000)
+    }
+
+    function stopPolling() {
+      if (intervalId !== null) {
+        clearInterval(intervalId)
+        intervalId = null
+      }
+    }
+
+    function handleVisibility() {
+      if (document.hidden) stopPolling()
+      else startPolling()
+    }
+
+    // Inicia apenas se a aba já está visível ao montar
+    if (!document.hidden) startPolling()
+
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    return () => {
+      stopPolling()
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
   }, [])
 
   const cfg = STATUS_CONFIG[data.status]
