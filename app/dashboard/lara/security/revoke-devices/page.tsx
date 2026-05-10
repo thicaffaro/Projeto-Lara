@@ -13,8 +13,9 @@
  * ❌ Não afeta: conexão WhatsApp, agendamentos, dados da conta
  */
 
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
+import { PinInput } from '@/components/dashboard/PinInput'
 
 type Phase = 'confirm' | 'success'
 
@@ -24,12 +25,7 @@ export default function RevokeDevicesPage() {
   const [error,   setError]   = useState<string>()
   const [loading, setLoading] = useState(false)
 
-  const pinRef = useRef<HTMLInputElement>(null)
-  useEffect(() => { pinRef.current?.focus() }, [])
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-
+  async function handleConfirm() {
     if (!/^\d{4}$/.test(pin)) {
       setError('Digite seu PIN de 4 dígitos para confirmar.')
       return
@@ -51,7 +47,6 @@ export default function RevokeDevicesPage() {
         if (res.status === 401) {
           setError('PIN incorreto. Tente novamente.')
           setPin('')
-          pinRef.current?.focus()
           return
         }
         setError(json.error ?? 'Erro ao processar. Tente novamente.')
@@ -127,43 +122,25 @@ export default function RevokeDevicesPage() {
         </ul>
       </div>
 
-      {/* Form de confirmação por PIN */}
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label htmlFor="pin-confirm" className="block text-sm font-medium text-gray-700">
-            Confirme seu PIN para prosseguir
-          </label>
-          <input
-            id="pin-confirm"
-            ref={pinRef}
-            type="password"
-            inputMode="numeric"
-            maxLength={4}
-            pattern="[0-9]{4}"
-            value={pin}
-            onChange={e => {
-              setPin(e.target.value.replace(/\D/g, '').slice(0, 4))
-              setError(undefined)
-            }}
-            placeholder="••••"
-            aria-describedby={error ? 'pin-err' : undefined}
-            aria-invalid={!!error}
-            className={`mt-1 block w-full rounded-xl border px-4 py-3 text-center text-2xl font-bold tracking-[0.5em] focus:outline-none focus:ring-2 ${
-              error
-                ? 'border-red-400 focus:ring-red-200'
-                : 'border-gray-300 focus:border-rose-400 focus:ring-rose-200'
-            }`}
-          />
-          {error && (
-            <p id="pin-err" role="alert" className="mt-1 text-xs text-red-600">{error}</p>
-          )}
-        </div>
+      {/* Confirmação por PIN — mesmo padrão visual das Tarefas 2 e 3 (4 caixinhas) */}
+      <div className="space-y-4">
+        <PinInput
+          value={pin}
+          onChange={v => { setPin(v); setError(undefined) }}
+          label="Confirme seu PIN para prosseguir"
+          disabled={loading}
+          autoFocus
+        />
+
+        {error && (
+          <p role="alert" className="text-xs text-red-600">{error}</p>
+        )}
 
         {/* CTAs */}
         <div className="flex flex-col gap-2">
-          {/* Cor warning (não red) — não é ação destrutiva, é reversível */}
+          {/* Cor warning (não red) — ação reversível via link no WhatsApp */}
           <button
-            type="submit"
+            onClick={handleConfirm}
             disabled={pin.length < 4 || loading}
             className="w-full rounded-xl border border-amber-400 bg-amber-50 py-3.5 text-sm font-semibold text-amber-700 transition hover:bg-amber-100 active:scale-95 disabled:opacity-40"
           >
@@ -177,7 +154,7 @@ export default function RevokeDevicesPage() {
             Cancelar
           </Link>
         </div>
-      </form>
+      </div>
 
       <p className="text-center text-xs text-gray-400">
         Não lembra do PIN?{' '}

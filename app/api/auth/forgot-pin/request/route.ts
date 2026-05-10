@@ -50,8 +50,23 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     recovery_email: string | null
   } | null
 
-  // Conta não existe → retorna 200 silencioso
-  if (!professional) return SILENT_OK
+  // Conta não existe → retorna 200 silencioso (não vaza existência)
+  // Audit log da tentativa — útil para detectar enumeração de phones
+  if (!professional) {
+    await supabase.from('audit_log').insert({
+      professional_id: null,
+      actor: 'anonymous',
+      action: 'forgot_pin_request_unknown_phone',
+      new_data: {
+        // Não logar o phone completo — apenas últimos 4 dígitos para rastreamento
+        phone_suffix: phone.slice(-4),
+        channel,
+      },
+    }).then(null, (e: Error) =>
+      console.error('[forgot-pin/request] audit_log unknown_phone falhou:', e.message)
+    )
+    return SILENT_OK
+  }
 
   // Canal 'email' sem recovery_email → retorna 200 silencioso
   if (channel === 'email' && !professional.recovery_email) return SILENT_OK
