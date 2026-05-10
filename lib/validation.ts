@@ -2,6 +2,19 @@
  * /lib/validation.ts
  * Validadores de CPF, CNPJ e telefone brasileiro.
  * Sem dependências externas — lógica pura, testável.
+ *
+ * ALGORITMOS IMPLEMENTADOS (não apenas máscara):
+ *
+ * CPF:
+ *   - Rejeita todos dígitos iguais: /^(\d)\1{10}$/ → "11111111111" = false ✓
+ *   - 1º DV: Σ d[i] × (10-i) para i=0..8; rem = (soma×10) % 11; rem∈{10,11} → 0
+ *   - 2º DV: Σ d[i] × (11-i) para i=0..9; rem = (soma×10) % 11; rem∈{10,11} → 0
+ *
+ * CNPJ:
+ *   - Rejeita todos dígitos iguais: /^(\d)\1{13}$/ → "00000000000000" = false ✓
+ *   - 1º DV: pesos [5,4,3,2,9,8,7,6,5,4,3,2] (len=12, pos=len-7=5, cicla de volta a 9)
+ *   - 2º DV: pesos [6,5,4,3,2,9,8,7,6,5,4,3,2] (len=13, pos=len-7=6, cicla de volta a 9)
+ *   - r = soma % 11; r < 2 → DV=0; caso contrário DV = 11-r
  */
 
 // ── CPF ───────────────────────────────────────────────────────────────────────

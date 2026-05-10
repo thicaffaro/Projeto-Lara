@@ -150,6 +150,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   // ── Upsert subscription ───────────────────────────────────────────────────
+  //
+  // DISTINÇÃO CRÍTICA:
+  //   status='cancelled'  → término DEFINITIVO da assinatura (este webhook)
+  //   is_paused=true      → suspensão TEMPORÁRIA (controlada por token_invalid >7 dias)
+  //   São estados independentes — NÃO misturar.
+  const now = new Date().toISOString()
+
   const { error: upsertError } = await supabase
     .from('subscriptions')
     .upsert(
@@ -157,8 +164,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         professional_id:    professionalId,
         mp_subscription_id: mpSubscriptionId,
         status:             laraStatus,
-        // mp_paused_at: registra quando MP pausou a assinatura
-        ...(mpStatus === 'paused' ? { mp_paused_at: new Date().toISOString() } : {}),
+        // cancelled_at: apenas em cancelamento definitivo (ver 0006_subscriptions_unique.sql)
+        ...(laraStatus === 'cancelled' ? { cancelled_at: now }      : {}),
+        // mp_paused_at: quando MP pausou a cobrança (ex: cartão recusado)
+        ...(mpStatus   === 'paused'    ? { mp_paused_at: now }       : {}),
       },
       { onConflict: 'professional_id' },
     )
@@ -169,13 +178,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return new NextResponse('Internal Server Error', { status: 500 })
   }
 
-  // Se cancelado, marca o professional como pausado
-  if (laraStatus === 'cancelled') {
-    await supabase
-      .from('professionals')
-      .update({ is_paused: true })
-      .eq('id', professionalId)
-  }
+  // Cancelamento: NÃO toca is_paused — esse campo é controlado por outra lógica
+  // (token_invalid >7 dias → billing_paused_at em professionals).
+  // O acesso via dashboard expira naturalmente quando status='cancelled'.
 
   console.log(
     `[webhook/mp] Subscription atualizada — professional: ${professionalId}, status: ${laraStatus}`

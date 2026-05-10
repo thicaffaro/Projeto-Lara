@@ -76,11 +76,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const { accessToken: shortToken } = await exchangeCodeForToken(code)
     longLivedToken = await exchangeForLongLivedToken(shortToken)
   } catch (err) {
+    // Sanitiza: aceita apenas mensagem de WhatsAppApiError (já sanitizada em /lib/whatsapp.ts)
+    // Se err for outro tipo, usa mensagem genérica — garante que nenhum body de resposta
+    // da Graph API (que pode conter token em casos de bug da Meta) vaze para logs.
     const msg = err instanceof WhatsAppApiError
       ? err.message
       : 'Falha ao autenticar com a Meta. Tente novamente.'
-    // Log sem o code
-    console.error('[exchange-token] Falha OAuth:', msg)
+    // Log: contém apenas msg sanitizada — sem code, sem token, sem body de resposta
+    console.error('[exchange-token] Falha OAuth — professional phone redacted, msg:', msg)
     return NextResponse.json({ error: msg }, { status: 502 })
   }
 

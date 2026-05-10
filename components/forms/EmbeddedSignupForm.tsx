@@ -249,6 +249,52 @@ export function EmbeddedSignupForm({ mode = 'onboarding', professionalId: existi
     setFormSubmitting(false)
   }
 
+  // ── Retry seletivo por etapa ──────────────────────────────────────────────
+  //
+  // Regra:
+  //   Etapas 1–4 (índices 0–3): precisam de novo código OAuth → restart completo
+  //   Etapa 5 (índice 4):       professionalId já está em state → retry só step 5
+  //   Etapa 6 (índice 5):       gerenciada pelos sub-phases de verificação
+  //
+  // Isso garante que a esteticista NÃO perde o progresso das etapas concluídas
+  // quando apenas register-number (etapa 5) falha.
+  function handleRetry() {
+    if (currentStep === 4 && professionalId) {
+      // Etapa 5 falhou: professionalId preservado, skip steps 1-4
+      setStepStatus(4, 'pending', undefined)
+      retryRegisterNumber(professionalId)
+    } else {
+      // Etapas 1-4: precisa de novo code OAuth → restart completo
+      setSteps(INITIAL_STEPS)
+      setCurrentStep(0)
+      runOnboarding()
+    }
+  }
+
+  async function retryRegisterNumber(profId: string) {
+    setCurrentStep(4)
+    setStepStatus(4, 'loading')
+    try {
+      const res = await fetch('/api/onboarding/register-number', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ professionalId: profId }),
+      })
+      const json = await res.json()
+      if (!res.ok || json.error) {
+        setStepStatus(4, 'error', json.error ?? 'Falha ao registrar número.')
+        return
+      }
+      setStepStatus(4, 'success')
+      // Prossegue para etapa 6 com estado preservado
+      setCurrentStep(5)
+      setStepStatus(5, 'loading')
+      await handleRequestCode(profId, verifyMethod)
+    } catch {
+      setStepStatus(4, 'error', 'Erro de rede ao registrar número.')
+    }
+  }
+
   // ── Fluxo de 6 etapas ────────────────────────────────────────────────────
 
   const runOnboarding = useCallback(async () => {
@@ -646,14 +692,12 @@ export function EmbeddedSignupForm({ mode = 'onboarding', professionalId: existi
             {/* Botão Tentar novamente (em erro antes da etapa 6) */}
             {hasError && currentStep < 5 && (
               <button
-                onClick={() => {
-                  setSteps(INITIAL_STEPS)
-                  setCurrentStep(0)
-                  runOnboarding()
-                }}
+                onClick={handleRetry}
                 className="w-full rounded-xl border border-rose-300 bg-white px-6 py-3 text-sm font-medium text-rose-600 transition hover:bg-rose-50"
               >
-                Tentar novamente
+                {currentStep === 4 && professionalId
+                  ? 'Tentar novamente (etapa 5)'
+                  : 'Tentar novamente (do início)'}
               </button>
             )}
           </motion.div>
