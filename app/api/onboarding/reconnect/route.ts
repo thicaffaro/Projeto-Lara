@@ -17,6 +17,10 @@
  *   3. EmbeddedSignupForm abre no modo 'reconnect'
  *   4. Após OAuth, chama este endpoint
  *   5. Continua com /register-number e /verify-code normalmente
+ *
+ * BILLING:
+ *   Após reconexão bem-sucedida, tenta retomar cobrança MP via
+ *   resumeBillingForProfessional (fire-and-forget — falha não bloqueia resposta).
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -27,6 +31,7 @@ import {
   exchangeForLongLivedToken,
   WhatsAppApiError,
 } from '@/lib/whatsapp'
+import { resumeBillingForProfessional } from '@/lib/billing/auto-resume'
 
 interface ReconnectBody {
   code: string
@@ -112,6 +117,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   console.log(`[reconnect] Reconexão bem-sucedida — professional: ${professionalId}`)
+
+  // Tenta retomar cobrança MP de forma fire-and-forget.
+  // Se a cobrança estava pausada (token_invalid > 7 dias), retoma agora.
+  // Se a MP falhar, a resposta de reconexão NÃO é bloqueada — degradação graceful.
+  resumeBillingForProfessional(professionalId).catch((e: Error) =>
+    console.error('[reconnect] resumeBilling falhou (não-crítico):', e.message, 'professional:', professionalId)
+  )
 
   return NextResponse.json({ ok: true, professionalId }, { status: 200 })
 }
