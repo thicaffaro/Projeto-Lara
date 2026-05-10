@@ -21,6 +21,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createHmac, timingSafeEqual } from 'crypto'
 import { waitUntil } from '@vercel/functions'
 import { createAdminClient } from '@/lib/supabase/admin'
+import {
+  handleTemplateStatusUpdate,
+  type TemplateStatusUpdateValue,
+} from '@/lib/templates'
 
 // ── Tipos do payload Meta ─────────────────────────────────────────────────────
 
@@ -125,7 +129,30 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return new NextResponse('OK', { status: 200 })
   }
 
-  // ── 4. Verificar idempotência por meta_message_id ──────────────────────────
+  // ── 4. Tratar atualizações de status de template (SÍNCRONO) ──────────────
+  // Processado aqui (não em background) pois precisa atualizar o banco
+  // e potencialmente iniciar o trial — ambos devem ocorrer antes do 200.
+  const allChanges = payload.entry?.[0]?.changes ?? []
+  const templateStatusChange = allChanges.find(
+    c => c.field === 'message_template_status_update'
+  )
+
+  if (templateStatusChange) {
+    const wabaId = payload.entry?.[0]?.id ?? ''
+    try {
+      await handleTemplateStatusUpdate(
+        templateStatusChange.value as unknown as TemplateStatusUpdateValue,
+        wabaId,
+      )
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'erro desconhecido'
+      console.error('[webhook/whatsapp] handleTemplateStatusUpdate falhou:', msg)
+      // Retorna 200 mesmo em falha — Meta não deve reenviar indefinidamente
+    }
+    return new NextResponse('OK', { status: 200 })
+  }
+
+  // ── 5. Verificar idempotência por meta_message_id ─────────────────────────
   const messageId = payload.entry?.[0]?.changes?.[0]?.value?.messages?.[0]?.id
 
   if (messageId) {
@@ -142,7 +169,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
   }
 
-  // ── 5. Retornar 200 IMEDIATAMENTE, processar em background ────────────────
+  // ── 6. Retornar 200 IMEDIATAMENTE, processar em background ────────────────
   // waitUntil garante que o processamento conclua mesmo após o response ser enviado.
   // Meta considera timeout > 20s como falha — este padrão garante < 200ms de resposta.
   waitUntil(forwardToN8n(payload, messageId))

@@ -337,3 +337,39 @@ export async function getProfessionalToken(professionalId: string): Promise<stri
 
   return decryptToken(data.access_token_encrypted)
 }
+
+// ── Envio de texto livre pelo número do profissional ─────────────────────────
+
+/**
+ * Envia uma mensagem de texto pelo número da própria profissional.
+ * Usar APENAS dentro da janela de 24h (is_within_meta_window = true).
+ * Fora da janela, usar sendTemplate via /lib/templates.ts.
+ *
+ * @param phoneNumberId   - meta_phone_number_id da profissional
+ * @param accessToken     - Token de acesso decriptografado (usar imediatamente)
+ * @param toPhoneNumber   - Número do destinatário (será limpo de máscaras)
+ * @param text            - Texto da mensagem
+ * @param professionalId  - Para detecção de token_invalid (opcional)
+ */
+export async function sendTextMessage(
+  phoneNumberId: string,
+  accessToken: string,
+  toPhoneNumber: string,
+  text: string,
+  professionalId?: string,
+): Promise<void> {
+  await graphRequest(
+    `/${phoneNumberId}/messages`,
+    {
+      method: 'POST',
+      token: accessToken,
+      body: {
+        messaging_product: 'whatsapp',
+        to: toPhoneNumber.replace(/\D/g, ''),
+        type: 'text',
+        text: { body: text },
+      },
+    },
+    professionalId,
+  )
+}
