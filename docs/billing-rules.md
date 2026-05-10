@@ -108,6 +108,37 @@ A retomada é fire-and-forget no endpoint de reconexão. Se a API MP falhar:
 - Cobrança ainda está pausada no MP — pode haver ciclo sem cobrança inesperado
 - Necessário criar `checkAndResumePending` no Prompt E para processar esses casos
 
+### Profissional cancela durante a pausa
+
+**Resultado:** Cobrança **não retoma** — verificação de status impede chamada ao MP.
+
+Fluxo do risco sem proteção:
+1. Token expira → 7 dias → `billing_paused_at` preenchido, `subscriptions.status = 'past_due'`
+2. Profissional cancela assinatura → `subscriptions.status = 'cancelled'`
+3. Meses depois, reconecta por qualquer motivo
+4. Sem proteção: `resumePreapproval` reativaria assinatura cancelada → **cobrança indevida**
+
+**Proteção implementada em `auto-resume.ts`:**
+
+```typescript
+// 1. Bloqueia se cancelada — não há cobrança legítima a retomar
+if (sub.status === 'cancelled' || sub.status === 'cancelled_pending_anonymization') {
+  // Limpa billing_paused_at (sem chamar MP) + audit log
+  return  // saída limpa
+}
+
+// 2. Bloqueia se status inesperado — só retoma quando 'past_due'
+if (sub.status !== 'past_due') {
+  // audit log + return
+}
+
+// 3. Seguro: status é 'past_due' → resumePreapproval()
+```
+
+Audit logs gerados:
+- `billing_resume_skipped_cancelled` — cancelamento detectado, billing_paused_at limpo
+- `billing_resume_skipped_unexpected_status` — estado inconsistente, nenhuma ação
+
 ### Profissional sem `mp_subscription_id`
 
 **Resultado:** Pausa e retomada são ignoradas com warning.

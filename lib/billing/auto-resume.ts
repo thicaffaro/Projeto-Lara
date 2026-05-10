@@ -73,7 +73,56 @@ export async function resumeBillingForProfessional(
     return
   }
 
-  // ── Retoma no Mercado Pago ────────────────────────────────────────────────
+  // ── Guarda de status da subscription ANTES de chamar o MP ────────────────
+  //
+  // CRÍTICO — previne cobrança indevida (risco Procon):
+  //   Cenário: billing pausado → profissional cancela → meses depois reconecta
+  //   Sem esta verificação: resumePreapproval reativaria assinatura cancelada
+  //
+  // Status esperado para retomada: 'past_due' (setado pelo auto-pause)
+  // Status que bloqueiam retomada: 'cancelled', 'cancelled_pending_anonymization'
+
+  if (sub.status === 'cancelled' || sub.status === 'cancelled_pending_anonymization') {
+    console.log(
+      `[auto-resume] Retomada bloqueada — subscription cancelada.`,
+      'professional:', professionalId, 'status:', sub.status,
+    )
+    // Limpa billing_paused_at para não reaparece em verificações futuras,
+    // mas NÃO retoma o MP (assinatura cancelada = sem cobrança)
+    await supabase
+      .from('professionals')
+      .update({ billing_paused_at: null })
+      .eq('id', professionalId)
+    await supabase.from('audit_log').insert({
+      professional_id: professionalId,
+      actor: 'system',
+      action: 'billing_resume_skipped_cancelled',
+      new_data: { subscription_status: sub.status },
+    }).then(null, (e: Error) =>
+      console.error('[auto-resume] audit_log (skipped_cancelled) falhou:', e.message)
+    )
+    return
+  }
+
+  // Status inesperado (nem past_due nem cancelled) — provavelmente inconsistência
+  // de estado. Não retomar para não causar efeito colateral indesejado.
+  if (sub.status !== 'past_due') {
+    console.warn(
+      `[auto-resume] Status inesperado '${sub.status}' — retomada bloqueada.`,
+      'professional:', professionalId,
+    )
+    await supabase.from('audit_log').insert({
+      professional_id: professionalId,
+      actor: 'system',
+      action: 'billing_resume_skipped_unexpected_status',
+      new_data: { subscription_status: sub.status },
+    }).then(null, (e: Error) =>
+      console.error('[auto-resume] audit_log (unexpected_status) falhou:', e.message)
+    )
+    return
+  }
+
+  // ── Status é 'past_due' — retomada é segura ───────────────────────────────
   try {
     await resumePreapproval(sub.mp_subscription_id)
 
