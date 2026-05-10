@@ -107,6 +107,38 @@ export async function PATCH(req: NextRequest): Promise<NextResponse> {
   let shouldRefreshSession = false
 
   if (professionals?.onboarding_completed === true) {
+    // ── Aceite automático de documentos legais vigentes ─────────────────────
+    // Profissional nova aceitou os termos implicitamente ao completar o
+    // onboarding — evita banner "Atualizamos nossa Política" imediatamente
+    // após o cadastro, que seria confuso e frustrante.
+    const now = new Date().toISOString()
+    const { data: currentDocs } = await supabase
+      .from('legal_documents')
+      .select('id, doc_type')
+      .lte('effective_at', now)
+      .order('version', { ascending: false })
+
+    // Agrupa por doc_type — pega apenas a versão mais recente de cada
+    const latestByType = new Map<string, string>()
+    for (const doc of (currentDocs ?? []) as Array<{ id: string; doc_type: string }>) {
+      if (!latestByType.has(doc.doc_type)) {
+        latestByType.set(doc.doc_type, doc.id)
+      }
+    }
+
+    // INSERT aceite para cada doc_type (upsert idempotente)
+    for (const [docType, docId] of latestByType) {
+      await supabase.from('professional_consents').upsert({
+        professional_id:   professionalId,
+        doc_type:          docType,
+        legal_document_id: docId,
+        accepted_at:       now,
+      }, { onConflict: 'professional_id,doc_type,legal_document_id', ignoreDuplicates: true }
+      ).then(null, (e: Error) =>
+        console.error('[onboarding/state] legal consent insert falhou:', e.message)
+      )
+    }
+
     const { data: prof } = await supabase
       .from('professionals')
       .select('auth_user_id')

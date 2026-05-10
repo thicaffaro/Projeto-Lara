@@ -5,12 +5,20 @@
  * RESPONSABILIDADES:
  *  1. Redirect /dashboard → /onboarding/setup se onboarding_completed=false
  *  2. Rate limiting por rota (via Upstash) — antes de qualquer auth check
+ *  3. Bloqueio de escrita por pendência legal (HTTP 451) após 3 dias de carência
  *
  * LIMITES:
  *   /api/onboarding/*     → 5  req/min por IP
  *   /api/dashboard/auth/* → 10 req/min por IP
  *   /api/admin/*          → 30 req/min por userId (header x-user-id)
  *   /api/webhooks/*       → SEM LIMITE (HMAC protege)
+ *
+ * BLOQUEIO LEGAL (HTTP 451 "Unavailable For Legal Reasons"):
+ *   Padrão: "bloquear tudo por padrão, isentar por exceção" (denylist).
+ *   - TODAS as rotas de escrita são bloqueadas após 3 dias de carência
+ *   - EXCEÇÕES explícitas listadas em LEGAL_EXEMPT_ROUTES
+ *   - Rotas novas ficam automaticamente protegidas sem intervenção manual
+ *   Ver /docs/legal-versioning.md e /docs/security.md
  *
  * REDIRECT DE ONBOARDING:
  *  - Lê onboarding_completed do JWT user_metadata (sem query ao banco)
@@ -21,6 +29,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { checkRateLimit, rateLimitHeaders, getClientIp } from '@/lib/ratelimit'
+import { checkPendingAcceptance } from '@/lib/legal/check-pending-acceptance'
+
+// ── Padrão "block by default, exempt by exception" ────────────────────────────
+// Rotas que funcionam MESMO sem aceite legal vigente.
+// Rotas não listadas aqui serão bloqueadas automaticamente quando houver
+// pendência legal >= 3 dias — novos endpoints ficam protegidos por padrão.
+const LEGAL_EXEMPT_ROUTES = [
+  '/api/auth/',          // login, logout, reset-pin, forgot-pin
+  '/api/legal/',         // current, accept, pending — precisam funcionar para aceitar!
+  '/api/onboarding/',    // onboarding não exige aceite prévio (aceita ao concluir)
+  '/api/webhooks/',      // webhooks Meta/MP não podem ser bloqueados
+] as const
+
+const LEGAL_WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
 // ── Configuração do matcher ───────────────────────────────────────────────────
 
@@ -28,9 +50,9 @@ export const config = {
   matcher: [
     '/dashboard/:path*',           // redirect de onboarding
     '/api/onboarding/:path*',
-    '/api/dashboard/auth/:path*',
+    '/api/dashboard/:path*',       // inclui rotas de escrita + bloqueio legal
     '/api/admin/:path*',
-    // /api/webhooks/* é intencionalmente EXCLUÍDO — HMAC é a proteção
+    // /api/webhooks/* e /api/legal/* são intencionalmente EXCLUÍDOS
   ],
 }
 
@@ -73,6 +95,53 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
     }
 
     return NextResponse.next()
+  }
+
+  // ── Bloqueio legal: "block by default, exempt by exception" ─────────────────
+  // Todas as rotas de escrita (/api/**) são bloqueadas com HTTP 451 após 3 dias
+  // de carência, EXCETO as listadas em LEGAL_EXEMPT_ROUTES.
+  // Padrão denylist: novos endpoints ficam protegidos automaticamente.
+  const isApiWrite   = pathname.startsWith('/api/') && LEGAL_WRITE_METHODS.has(req.method)
+  const isLegalExempt = LEGAL_EXEMPT_ROUTES.some((prefix: string) => pathname.startsWith(prefix))
+
+  if (isApiWrite && !isLegalExempt) {
+    try {
+      const supabase = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+          cookies: {
+            getAll: () => req.cookies.getAll(),
+            setAll: () => {},
+          },
+        }
+      )
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        // Busca professional_id do user_metadata (sem query adicional ao banco)
+        const professionalId = user.user_metadata?.professional_id as string | undefined
+
+        if (professionalId) {
+          const legalStatus = await checkPendingAcceptance(professionalId)
+
+          if (legalStatus.any_write_blocked) {
+            // HTTP 451: Unavailable For Legal Reasons
+            return NextResponse.json(
+              {
+                error: 'legal_acceptance_required',
+                message: 'Você precisa aceitar os documentos legais atualizados antes de continuar.',
+                pending_docs: legalStatus.pending_docs.filter(d => d.write_blocked),
+              },
+              { status: 451 }
+            )
+          }
+        }
+      }
+    } catch {
+      // Fail-open: erro no check legal não bloqueia operações
+      // O banner na UI ainda vai mostrar a pendência
+    }
   }
 
   // ── Determina contexto e identificador ─────────────────────────────────────
