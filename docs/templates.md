@@ -1,6 +1,9 @@
 # Templates Meta — Lara
 
+**Versão:** 1.0 | **Última atualização:** 2025-01
+
 Documentação da gestão de templates WhatsApp Business (categoria UTILITY).
+Ver `/docs/onboarding.md` para contexto de como os templates se relacionam com o trial.
 
 ---
 
@@ -169,11 +172,38 @@ if (failed.length > 0) {
 
 ---
 
+## Política de início de trial por service_mode
+
+Conforme `REQUIRED_TEMPLATES_BY_MODE` em `/lib/templates.ts`:
+
+| service_mode | Templates obrigatórios | Threshold (80%) |
+|---|---|---|
+| `studio` | 5 (sem `home_visit_confirmation`) | 4 de 5 aprovados |
+| `home` | 6 (todos) | 5 de 6 aprovados |
+
+`home_visit_confirmation` é irrelevante para profissionais em mode=`studio` —
+não faz sentido exigi-lo. O trial não é bloqueado por ele neste caso.
+
+## O que acontece quando todas 3 variantes do mesmo nome falham
+
+1. `sendTemplate()` retorna `{ ok: false, error: 'no_approved_variant' }`
+2. Registra em `audit_log` com `action='template_no_variant_available'`
+3. Notifica equipe ops via `LARA_OPS_PHONE` (Canal 2 — ver `/docs/communication-channels.md`)
+4. `sendMessageWithFallback()` retorna `{ error: 'cannot_send_outside_window' }`
+5. A mensagem não é enviada — a profissional precisa reenviar manualmente pelo painel
+
+Nenhum variant aprovado + janela 24h expirada = comunicação impossível para aquele template.
+A solução é sempre ter pelo menos 1 variante aprovada dos templates obrigatórios.
+
+---
+
 ## Arquivos relacionados
 
 | Arquivo | Responsabilidade |
 |---|---|
-| `/lib/templates.ts` | LARA_TEMPLATES, submitAllTemplates, sendTemplate, TEMPLATE_FALLBACKS, sendMessageWithFallback, handleTemplateStatusUpdate |
-| `/lib/whatsapp.ts` | sendTextMessage, graphRequest, detecção token_invalid |
+| `/lib/templates.ts` | LARA_TEMPLATES, submitAllTemplates, sendTemplate, TEMPLATE_FALLBACKS, sendMessageWithFallback, handleTemplateStatusUpdate, REQUIRED_TEMPLATES_BY_MODE |
+| `/lib/whatsapp.ts` | sendTextMessage, graphRequest, detecção token_invalid, Retry-After em 429 |
 | `/app/api/webhooks/whatsapp/route.ts` | Recebe webhook de status_update, chama handleTemplateStatusUpdate |
 | `/sql/migrations/0001_initial.sql` | Tabela templates, enum template_status, enum template_variant |
+| `/docs/communication-channels.md` | Canais LARA_OFFICIAL_PHONE e LARA_OPS_PHONE |
+| `/docs/onboarding.md` | Contexto de trial e submissão de templates no onboarding |

@@ -1,5 +1,7 @@
 # Autenticação — Lara
 
+**Versão:** 1.0 | **Última atualização:** 2025-01
+
 Documentação do esquema de autenticação de profissionais.
 
 ---
@@ -120,8 +122,44 @@ Quando `whatsapp_status='token_invalid'` é detectado:
 A coluna `professionals.recovery_email` (TEXT NULL) armazena o email real
 da profissional para fluxos de recuperação de PIN e reconexão Meta.
 
-**Fluxo:** `/api/onboarding/recovery-email/route.ts` (Parte 2 do Prompt B2).
-**Componente:** `/components/forms/RecoveryEmailForm.tsx`.
+**Fluxo:** Passo 6 do onboarding (`/components/forms/RecoveryEmailForm.tsx`).
+**Componente:** `/components/forms/RecoveryEmailForm.tsx` ✓ implementado.
 
-Até que este fluxo seja implementado, recuperação de acesso é feita pelo
-suporte via `wa.me/5511978663056`.
+Se pulado no onboarding, pode ser configurado depois em `/dashboard/lara/security`.
+Até configurar, recuperação de acesso é feita pelo suporte via `wa.me/5511978663056`.
+
+---
+
+## Mapeamento auth.users ↔ professionals
+
+```
+auth.users.id  ←→  professionals.auth_user_id
+    │                        │
+    │                        └─ Usado em RLS: WHERE auth.uid() = auth_user_id
+    │
+    └─ user_metadata: {
+         professional_id: UUID,
+         onboarding_completed: boolean,  ← lido pelo middleware sem DB query
+         phone_number: string
+       }
+```
+
+O `user_metadata.onboarding_completed` é atualizado em:
+- Criação (`false`) — etapa 4 do Embedded Signup
+- Conclusão (`true`) — `PATCH /api/onboarding/state` com `professionals.onboarding_completed=true`
+
+O middleware lê este campo do JWT para redirecionar `/dashboard → /onboarding/setup`
+sem precisar fazer query ao banco em cada request.
+
+---
+
+## Considerações de segurança
+
+| Regra | Implementação |
+|---|---|
+| Token Meta nunca em logs | `catch` blocks genéricos; variável zerada após uso |
+| Token nunca em resposta HTTP | API routes retornam apenas `{ professionalId }` |
+| Token nunca client-side | Funções de token são server-only |
+| Token criptografado em repouso | AES-256 via `pgp_sym_encrypt` (pgcrypto), chave em env |
+| Rotação de token | `/api/onboarding/reconnect` — atualiza token sem resetar trial |
+| Detecção de token inválido | `graphRequest()` → `code=190` → `whatsapp_status='token_invalid'` |

@@ -3,8 +3,8 @@
  * Next.js Edge Middleware — executa antes de qualquer route handler.
  *
  * RESPONSABILIDADES:
- *  1. Rate limiting por rota (via Upstash) — antes de qualquer auth check
- *  2. Headers de segurança adicionais para rotas de API
+ *  1. Redirect /dashboard → /onboarding/setup se onboarding_completed=false
+ *  2. Rate limiting por rota (via Upstash) — antes de qualquer auth check
  *
  * LIMITES:
  *   /api/onboarding/*     → 5  req/min por IP
@@ -12,19 +12,21 @@
  *   /api/admin/*          → 30 req/min por userId (header x-user-id)
  *   /api/webhooks/*       → SEM LIMITE (HMAC protege)
  *
- * NOTAS:
- *  - Rota /api/webhooks/* é explicitamente excluída do rate limit
- *  - Em desenvolvimento (Upstash não configurado), rate limit é ignorado
- *  - userId para admin vem do header x-user-id (injetado pelo auth layer)
+ * REDIRECT DE ONBOARDING:
+ *  - Lê onboarding_completed do JWT user_metadata (sem query ao banco)
+ *  - user_metadata é atualizado em /api/onboarding/state quando passo 7 conclui
+ *  - Fail-open: se não conseguir ler o JWT, deixa passar (dashboard verifica)
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { createServerClient } from '@supabase/ssr'
 import { checkRateLimit, rateLimitHeaders, getClientIp } from '@/lib/ratelimit'
 
 // ── Configuração do matcher ───────────────────────────────────────────────────
 
 export const config = {
   matcher: [
+    '/dashboard/:path*',           // redirect de onboarding
     '/api/onboarding/:path*',
     '/api/dashboard/auth/:path*',
     '/api/admin/:path*',
@@ -36,6 +38,42 @@ export const config = {
 
 export async function middleware(req: NextRequest): Promise<NextResponse> {
   const { pathname } = req.nextUrl
+
+  // ── Redirect de onboarding ─────────────────────────────────────────────────
+  if (pathname.startsWith('/dashboard')) {
+    try {
+      const supabase = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+          cookies: {
+            getAll: () => req.cookies.getAll(),
+            setAll: () => {}, // Edge: não persiste cookies aqui
+          },
+        }
+      )
+
+      const { data: { user } } = await supabase.auth.getUser()
+
+      if (!user) {
+        // Não autenticado — redireciona para login
+        return NextResponse.redirect(new URL('/cadastro', req.url))
+      }
+
+      // onboarding_completed é armazenado no user_metadata após o passo 7
+      // evitando query ao banco em cada request
+      const onboardingCompleted = user.user_metadata?.onboarding_completed === true
+
+      if (!onboardingCompleted) {
+        return NextResponse.redirect(new URL('/onboarding/setup', req.url))
+      }
+    } catch {
+      // Fail-open: erro ao ler sessão não bloqueia acesso ao dashboard
+      // O dashboard (server component) fará a verificação definitiva
+    }
+
+    return NextResponse.next()
+  }
 
   // ── Determina contexto e identificador ─────────────────────────────────────
   let context: 'onboarding' | 'auth' | 'admin'
