@@ -95,9 +95,11 @@ export function PreOnboardingModal({
   const s = strings.preOnboarding.modal
 
   const [showBackup, setShowBackup] = useState(false)
-  const [checks, setChecks] = useState({ c0: false, c1: false, c2: false })
+  // Array de 3 booleans — índice alinhado com s.checkboxes[i]
+  // Evita type assertion ao acessar checks[i] dinamicamente
+  const [checks, setChecks] = useState<[boolean, boolean, boolean]>([false, false, false])
 
-  const allChecked = checks.c0 && checks.c1 && checks.c2
+  const allChecked = checks[0] && checks[1] && checks[2]
 
   const handleEscape = useCallback(() => {
     if (showBackup) {
@@ -210,9 +212,13 @@ export function PreOnboardingModal({
                           key={i}
                           id={`pre-onboarding-check-${i}`}
                           label={label}
-                          checked={checks[`c${i}` as keyof typeof checks]}
+                          checked={checks[i]}
                           onChange={v =>
-                            setChecks(prev => ({ ...prev, [`c${i}`]: v }))
+                            setChecks(prev => {
+                              const next: [boolean, boolean, boolean] = [...prev]
+                              next[i] = v
+                              return next
+                            })
                           }
                         />
                       ))}
