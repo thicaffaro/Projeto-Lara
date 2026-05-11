@@ -112,7 +112,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         cpf_or_cnpj: cpfOrCnpj,
         meta_waba_id: wabaId,
         meta_phone_number_id: phoneNumberId,
-        access_token_encrypted: encryptedToken,
+        // BYTEA via REST API requer formato hex com prefixo \x
+        access_token_encrypted: '\\x' + encryptedToken.toString('hex'),
         whatsapp_status: 'connected',
       },
       { onConflict: 'phone_number', ignoreDuplicates: false },

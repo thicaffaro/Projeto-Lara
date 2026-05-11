@@ -103,7 +103,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const { error: updateError } = await supabase
     .from('professionals')
     .update({
-      access_token_encrypted: encryptedToken,
+      // BYTEA via REST API requer formato hex com prefixo \x
+      access_token_encrypted: '\\x' + encryptedToken.toString('hex'),
       whatsapp_status: 'connected',
       meta_waba_id: wabaId,
       meta_phone_number_id: phoneNumberId,

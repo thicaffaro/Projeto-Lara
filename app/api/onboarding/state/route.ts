@@ -130,7 +130,7 @@ export async function PATCH(req: NextRequest): Promise<NextResponse> {
     for (const [docType, docId] of latestByType) {
       await supabase.from('professional_consents').upsert({
         professional_id:   professionalId,
-        doc_type:          docType,
+        doc_type:          docType as 'privacy_policy' | 'terms_of_use',
         legal_document_id: docId,
         accepted_at:       now,
       }, { onConflict: 'professional_id,doc_type,legal_document_id', ignoreDuplicates: true }

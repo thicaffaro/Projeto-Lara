@@ -22,10 +22,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createHmac, timingSafeEqual } from 'crypto'
 import { createAdminClient } from '@/lib/supabase/admin'
+import type { SubscriptionStatus } from '@/lib/supabase/types'
 
 // ── Mapeamento de status MP → subscription_status ─────────────────────────────
 
-const MP_STATUS_MAP: Record<string, string> = {
+const MP_STATUS_MAP: Record<string, SubscriptionStatus> = {
   authorized:   'active',
   paused:       'past_due',
   cancelled:    'cancelled',

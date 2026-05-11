@@ -9,9 +9,7 @@
  */
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import type { Database } from './types-stub'
-
-// ⚠️ Database type vem de types-stub.ts até `supabase gen types typescript` no Prompt E.
+import type { Database } from './types'
 
 /**
  * Cria um cliente admin com service_role (bypassa RLS).

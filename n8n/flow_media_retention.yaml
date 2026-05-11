@@ -1,0 +1,119 @@
+# =============================================================================
+# flow_media_retention.yaml
+# Cron diário para remover mídias expiradas do Supabase Storage.
+#
+# Executa às 04:00 (UTC) diariamente.
+# Chama POST /api/n8n/media-cleanup com Bearer N8N_WEBHOOK_SECRET.
+# Processa até 500 mídias com mais de 90 dias por execução.
+#
+# Para importar: n8n UI → Settings → Import from file → selecione este arquivo
+# =============================================================================
+
+name: flow_media_retention
+
+nodes:
+  - id: cron-trigger
+    name: Cron — 4h diário
+    type: n8n-nodes-base.scheduleTrigger
+    typeVersion: 1.1
+    position: [240, 300]
+    parameters:
+      triggerTimes:
+        item:
+          - mode: everyDay
+            hour: 4
+            minute: 0
+
+  - id: http-cleanup
+    name: Chamar media-cleanup
+    type: n8n-nodes-base.httpRequest
+    typeVersion: 4.1
+    position: [460, 300]
+    parameters:
+      method: POST
+      url: "={{ $env['NEXT_PUBLIC_APP_URL'] }}/api/n8n/media-cleanup"
+      authentication: predefinedCredentialType
+      sendHeaders: true
+      headers:
+        values:
+          - name: Authorization
+            value: "=Bearer {{ $env['N8N_WEBHOOK_SECRET'] }}"
+          - name: Content-Type
+            value: application/json
+      sendBody: true
+      contentType: json
+      body: |
+        {
+          "retention_days": 90
+        }
+      options:
+        timeout: 55000
+        response:
+          response:
+            responseFormat: json
+
+  - id: check-result
+    name: Verificar resultado
+    type: n8n-nodes-base.if
+    typeVersion: 2
+    position: [680, 300]
+    parameters:
+      conditions:
+        options:
+          caseSensitive: true
+          leftValue: ""
+          typeValidation: strict
+        conditions:
+          - id: ok
+            leftValue: "={{ $json.ok }}"
+            rightValue: true
+            operator:
+              type: boolean
+              operation: equals
+
+  - id: log-success
+    name: Log — Sucesso
+    type: n8n-nodes-base.noOp
+    position: [900, 200]
+    parameters: {}
+
+  - id: log-error
+    name: Log — Erro
+    type: n8n-nodes-base.noOp
+    position: [900, 400]
+    parameters: {}
+
+connections:
+  cron-trigger:
+    main:
+      - - node: http-cleanup
+          type: main
+          index: 0
+
+  http-cleanup:
+    main:
+      - - node: check-result
+          type: main
+          index: 0
+
+  check-result:
+    main:
+      - - node: log-success
+          type: main
+          index: 0
+      - - node: log-error
+          type: main
+          index: 0
+
+settings:
+  executionOrder: v1
+  saveExecutionProgress: true
+  saveManualExecutions: true
+  callerPolicy: workflowsFromSameOwner
+  errorWorkflow: ""
+
+staticData: null
+tags:
+  - lara-media
+  - cron
+  - maintenance

@@ -65,10 +65,30 @@ psql $DATABASE_URL -f sql/migrations/0002_seed_admin.sql
 psql $DATABASE_URL -f sql/migrations/0003_seed_proactive_rules.sql
 psql $DATABASE_URL -f sql/migrations/0004_seed_legal_documents.sql
 psql $DATABASE_URL -f sql/migrations/0005_storage_policies.sql
+psql $DATABASE_URL -f sql/migrations/0006_subscriptions_unique.sql
+psql $DATABASE_URL -f sql/migrations/0007_fix_working_hours.sql
+psql $DATABASE_URL -f sql/migrations/0008_dashboard.sql
+psql $DATABASE_URL -f sql/migrations/0009_dashboard_extras.sql
+psql $DATABASE_URL -f sql/migrations/0010_partitions_2027.sql
 ```
 
 > **Atenção:** `0005_storage_policies.sql` requer que os buckets já existam.
 > Execute `storage-setup.ts` antes (passo 4).
+
+### Resumo das migrations
+
+| Arquivo | O que faz |
+|---|---|
+| `0001_initial.sql` | Schema completo: tabelas, partições 2025–2026, funções, triggers, RLS |
+| `0002_seed_admin.sql` | Seed da tabela `admin_users` |
+| `0003_seed_proactive_rules.sql` | 8 regras de mensagens proativas |
+| `0004_seed_legal_documents.sql` | Placeholder para PP e Termos de Uso v1 |
+| `0005_storage_policies.sql` | Políticas RLS para buckets `client-media` e `audit-archive` |
+| `0006_subscriptions_unique.sql` | Constraint UNIQUE em `subscriptions.professional_id` + coluna `cancelled_at` |
+| `0007_fix_working_hours.sql` | Recria `is_slot_available` com suporte a array de janelas por dia |
+| `0008_dashboard.sql` | Tabela `dashboard_sessions`, colunas PIN em `professionals` |
+| `0009_dashboard_extras.sql` | Coluna `lara_settings` em `professionals`, índices em `admin_actions_log` |
+| `0010_partitions_2027.sql` | Partições mensais 2027 para appointments, messages, audit\_log |
 
 ---
 
@@ -138,9 +158,29 @@ O n8n é responsável por:
 Configure no Railway com volume persistente e as variáveis `N8N_BASE_URL`,
 `N8N_API_KEY`, `N8N_ENCRYPTION_KEY`.
 
+Os workflows do n8n estão em `/n8n/*.yaml` e devem ser importados manualmente
+via n8n UI (Settings → Import from file).
+
 ---
 
-## 7. Verificação final
+## 7. Tipos TypeScript do Supabase
+
+Os tipos já estão em `lib/supabase/types.ts` (gerados manualmente a partir das
+migrations 0001–0009). Para regenerar com dados reais do Supabase Cloud Pro:
+
+```bash
+npx supabase gen types typescript \
+  --project-id <PROJECT_ID> \
+  --schema public \
+  > lib/supabase/types.ts
+```
+
+> **Após regenerar:** verifique se os tipos `ProfessionalRow`, `ContactRow` etc.
+> continuam exportados para compatibilidade com o código existente.
+
+---
+
+## 8. Verificação final
 
 ```sql
 -- Verificar tabelas criadas
@@ -157,16 +197,29 @@ SELECT email, role FROM admin_users;
 
 -- Verificar buckets
 SELECT id, name, public FROM storage.buckets;
+
+-- Verificar regras proativas
+SELECT name, enabled FROM proactive_message_rules ORDER BY name;
+
+-- Verificar documentos legais (substituir por conteúdo real antes do go-live)
+SELECT doc_type, version, effective_at FROM legal_documents ORDER BY doc_type, version;
 ```
 
 ---
 
 ## Checklist pós-setup
 
-- [ ] Migrations executadas (0001 → 0005)
+- [ ] Migrations executadas (0001 → 0010)
 - [ ] Usuário admin criado e senha trocada
 - [ ] `ADMIN_INITIAL_PASSWORD` removida do `.env.local`
 - [ ] Buckets `client-media` e `audit-archive` criados
 - [ ] Políticas RLS de storage aplicadas
 - [ ] n8n configurado no Railway com cron de `busy_slots`
+- [ ] Workflows n8n importados (`/n8n/*.yaml`)
 - [ ] Documentos legais revisados por advogado (`0004_seed_legal_documents.sql`)
+- [ ] Variáveis de ambiente configuradas no Vercel (Settings → Environment Variables)
+- [ ] Deploy Vercel conectado ao repositório GitHub (branch `main`)
+- [ ] CI passando em `.github/workflows/ci.yml`
+- [ ] Domínio `laraassistente.com.br` configurado no Vercel
+- [ ] Webhook Meta (WhatsApp) apontando para `https://laraassistente.com.br/api/webhooks/whatsapp`
+- [ ] Webhook Mercado Pago apontando para `https://laraassistente.com.br/api/webhooks/mercadopago`

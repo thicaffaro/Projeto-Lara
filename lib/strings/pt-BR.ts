@@ -174,6 +174,13 @@ export interface Strings {
       returnToLara: string; takeOver: string; silentBanner: string
       bookingOnlyBanner: string; fullBanner: string; changeMode: string
       modeUpdated: string; noTemplates: string; noMessages: string; loadMore: string
+      media: {
+        photo: string; audio: string; video: string; document: string; sticker: string
+        unavailable: string; downloading: string; uploadFailed: string
+        viewFullscreen: string; download: string
+      }
+      urgency: { notification: string }
+      retention: { deleted: string }
     }
     time: { now: string; today: string; yesterday: string }
     contacts: {
@@ -514,6 +521,24 @@ export const ptBR: Strings = {
       noTemplates:       'Seus templates ainda estão em análise pela Meta',
       noMessages:        'Nenhuma conversa ainda.',
       loadMore:          'Carregar mensagens anteriores',
+      media: {
+        photo:           'Foto',
+        audio:           'Áudio',
+        video:           'Vídeo',
+        document:        'Documento',
+        sticker:         'Figurinha',
+        unavailable:     'Mídia não disponível',
+        downloading:     'Baixando mídia...',
+        uploadFailed:    'Falha ao salvar mídia',
+        viewFullscreen:  'Ver em tela cheia',
+        download:        'Baixar',
+      },
+      urgency: {
+        notification:    'URGENTE: {name} precisa de atenção!',
+      },
+      retention: {
+        deleted:         'Mídia removida (política de retenção)',
+      },
     },
     time: {
       now:       'agora',

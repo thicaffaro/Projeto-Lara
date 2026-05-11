@@ -42,7 +42,7 @@ export async function PATCH(req: NextRequest): Promise<NextResponse> {
 
   const { error } = await supabase
     .from('appointments')
-    .update({ status })
+    .update({ status: status as AllowedStatus })
     .eq('id', appointment_id)
     .eq('professional_id', session.professionalId)
 

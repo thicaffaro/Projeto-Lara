@@ -1,0 +1,116 @@
+# =============================================================================
+# CI — Lara Assistente
+#
+# Jobs:
+#   typecheck  — tsc --noEmit (erros de tipo)
+#   lint       — next lint (ESLint)
+#   build      — next build (verifica bundle, depende de typecheck + lint)
+#
+# Segredos necessários no GitHub → Settings → Secrets and variables → Actions:
+#   NEXT_PUBLIC_SUPABASE_URL       URL do projeto Supabase (pública)
+#   NEXT_PUBLIC_SUPABASE_ANON_KEY  Chave anon Supabase (pública, RLS protege)
+#   NEXT_PUBLIC_META_APP_ID        Facebook App ID (público)
+#   NEXT_PUBLIC_META_CONFIG_ID     Config ID do Embedded Signup (público)
+#
+# Variáveis privadas (SUPABASE_SERVICE_ROLE_KEY, XAI_API_KEY, etc.) NÃO
+# são necessárias no build: usadas apenas em runtime. Se o build falhar por
+# falta delas, adicionar como secrets e passar no step build abaixo.
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Job 1: Typecheck
+  # ---------------------------------------------------------------------------
+  typecheck:
+    name: TypeScript
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run typecheck
+        run: npm run typecheck
+
+  # ---------------------------------------------------------------------------
+  # Job 2: Lint
+  # ---------------------------------------------------------------------------
+  lint:
+    name: ESLint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run lint
+        run: npm run lint
+
+  # ---------------------------------------------------------------------------
+  # Job 3: Build (depende de typecheck + lint)
+  # O build valida que todas as rotas compilam corretamente, incluindo
+  # Server Components, API routes e geração estática.
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [typecheck, lint]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          # Variáveis públicas necessárias para o build do Next.js.
+          # Valores placeholder seguros — o build não realiza chamadas reais.
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
+          NEXT_PUBLIC_META_APP_ID: ${{ secrets.NEXT_PUBLIC_META_APP_ID || '0' }}
+          NEXT_PUBLIC_META_CONFIG_ID: ${{ secrets.NEXT_PUBLIC_META_CONFIG_ID || '0' }}
+          NEXT_PUBLIC_META_GRAPH_VERSION: 'v19.0'
+          NEXT_PUBLIC_APP_URL: 'https://laraassistente.com.br'
+          # Variáveis de runtime — não usadas durante o build, mas evitam
+          # erros de "cannot find module" em imports de env vars.
+          SUPABASE_SERVICE_ROLE_KEY: 'placeholder'
+          TOKEN_ENCRYPTION_KEY: 'placeholder-32-chars-minimum-key!'
+          N8N_WEBHOOK_SECRET: 'placeholder'
+          UPSTASH_REDIS_REST_URL: 'https://placeholder.upstash.io'
+          UPSTASH_REDIS_REST_TOKEN: 'placeholder'

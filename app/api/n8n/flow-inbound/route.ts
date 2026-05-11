@@ -4,10 +4,15 @@
  *
  * Autenticado via Bearer N8N_WEBHOOK_SECRET.
  * Executa flowInbound e retorna resultado para o n8n logar.
+ *
+ * maxDuration: 60s — inclui chamadas ao LLM (Grok/Anthropic) com p99 ~15s.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { flowInbound, type InboundPayload } from '@/lib/ai/flowInbound'
+
+/** Limite de tempo da Serverless Function no Vercel (Pro plan: até 300s). */
+export const maxDuration = 60
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   // ── Autenticação ──────────────────────────────────────────────────────────

@@ -8,7 +8,10 @@
  */
 
 import { createAdminClient } from '@/lib/supabase/admin'
-import { randomUUID } from 'crypto'
+// Usar Web Crypto API global em vez de `import { randomUUID } from 'crypto'`:
+// o módulo crypto do Node.js não é compatível com Edge Runtime (middleware).
+// globalThis.crypto.randomUUID() funciona em Node.js 18+ e Edge Runtime.
+const randomUUID = () => globalThis.crypto.randomUUID()
 
 const SESSION_DAYS = 30
 const COOKIE_NAME  = 'dashboard_session'

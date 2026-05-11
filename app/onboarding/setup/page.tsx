@@ -15,7 +15,7 @@ import { cookies } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
 import { SetupStepper } from '@/components/onboarding/SetupStepper'
 import type { SetupState } from '@/lib/onboarding-types'
-import type { ProfessionalRow } from '@/lib/supabase/types-stub'
+import type { ProfessionalRow } from '@/lib/supabase/types'
 
 export default async function OnboardingSetupPage() {
   const cookieStore = await cookies()
@@ -39,7 +39,6 @@ export default async function OnboardingSetupPage() {
   if (!user) redirect('/cadastro')
 
   // Busca estado atual do profissional para inicializar o stepper.
-  // Cast para ProfessionalRow (types-stub) — será substituído por tipos gerados no Prompt E.
   const { data: rawProfessional } = await supabase
     .from('professionals')
     .select(
@@ -63,19 +62,23 @@ export default async function OnboardingSetupPage() {
     .eq('pre_registered', true)
     .in('contact_type', ['personal', 'business'])
 
-  // Importamos StudioAddress para o cast abaixo
+  // Importamos tipos auxiliares para os casts abaixo
   type SA = import('@/lib/onboarding-types').StudioAddress
+  type WH = import('@/lib/onboarding-types').WorkingHours
+  type SvcAreas = import('@/lib/onboarding-types').ServiceAreas
+  type PP = import('@/lib/onboarding-types').ProfessionalProtocol
 
   // Mapeia estado do banco para o formato do SetupStepper
+  // Os campos JSONB chegam como Json | null — casts explícitos são necessários
   const initialState: Partial<SetupState> = {
     serviceMode:           professional.service_mode ?? null,
     studioAddress:         (professional.studio_address ?? null) as SA | null,
     homeRadiusKm:          professional.home_service_radius_km ?? 15,
     homeBufferMin:         professional.home_service_buffer_min ?? 30,
-    workingHours:          professional.working_hours ?? {},
+    workingHours:          (professional.working_hours ?? {}) as WH,
     serviceAreasEnabled:   !!professional.service_areas,
-    serviceAreas:          professional.service_areas ?? {},
-    protocols:             professional.protocols ?? [],
+    serviceAreas:          (professional.service_areas ?? {}) as SvcAreas,
+    protocols:             (professional.protocols ?? []) as unknown as PP[],
     defaultLaraMode:       professional.default_lara_mode ?? 'cautious',
     preRegisteredContacts: (preContacts ?? []).map(c => ({
       name: (c as unknown as { name: string | null }).name ?? '',

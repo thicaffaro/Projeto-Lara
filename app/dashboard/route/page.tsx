@@ -3,8 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect } from 'react'
-import { cookies } from 'next/headers'
-import { formatTime, formatDateShort } from '@/lib/timezone'
+import { formatTime } from '@/lib/timezone'
 
 interface RouteAppt {
   id: string; protocol_name: string; starts_at: string; status: string

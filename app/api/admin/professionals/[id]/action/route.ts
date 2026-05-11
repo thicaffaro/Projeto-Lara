@@ -25,7 +25,8 @@ export async function POST(req: NextRequest, { params }: Props): Promise<NextRes
   // Log de todas as ações admin
   const logAction = async (a: string, details?: Record<string, unknown>) => {
     await adminSupabase.from('admin_actions_log').insert({
-      admin_user_id: user.id, professional_id: id, action: a, details: details ?? {},
+      admin_user_id: user.id, professional_id: id, action: a,
+      details: (details ?? {}) as import('@/lib/supabase/types').Json,
     }).then(null, () => {})
   }
 

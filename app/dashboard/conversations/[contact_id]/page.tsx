@@ -14,6 +14,11 @@ const s = strings.dashboard.conversations
 interface Message {
   id: string; content: string | null; direction: 'inbound' | 'outbound'
   sent_by?: 'lara' | 'professional' | null; created_at: string; lara_mode_decision?: string | null
+  // Campos de mídia (Prompt C2)
+  message_type:  string         // default 'text' para mensagens antigas
+  media_url?:    string | null
+  media_caption?: string | null
+  media_type?:   string | null
 }
 
 interface ContactData {

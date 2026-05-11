@@ -27,7 +27,7 @@ export async function PATCH(req: NextRequest, { params }: Props): Promise<NextRe
   const supabase = createAdminClient()
   const { error } = await supabase
     .from('contacts')
-    .update({ lara_mode })
+    .update({ lara_mode: lara_mode as 'full' | 'booking_only' | 'silent' })
     .eq('id', id)
     .eq('professional_id', session.professionalId)
 

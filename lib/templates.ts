@@ -302,7 +302,8 @@ export async function submitAllTemplates(
   // Decriptografa token — usar imediatamente, não armazenar
   let accessToken: string
   try {
-    accessToken = await decryptToken(professional.access_token_encrypted)
+    // non-null asserted: guard acima garante que não é null
+    accessToken = await decryptToken(professional.access_token_encrypted!)
   } catch {
     console.error('[templates] submitAllTemplates: falha ao decriptografar token:', professionalId)
     return LARA_TEMPLATES.map(t => ({
@@ -543,6 +544,10 @@ export async function sendTemplate(
     return { ok: false, error: 'professional_not_found' }
   }
 
+  if (!professional.access_token_encrypted) {
+    return { ok: false, error: 'graph_api_error', message: 'Token de acesso ausente' }
+  }
+
   let accessToken: string
   try {
     accessToken = await decryptToken(professional.access_token_encrypted)
@@ -635,6 +640,10 @@ export async function sendMessageWithFallback(
     return { ok: false, method: 'failed', error: 'professional_not_found' }
   }
 
+  if (!professional.access_token_encrypted) {
+    return { ok: false, method: 'failed', error: 'token_missing' }
+  }
+
   // ── Verifica janela Meta via RPC is_within_meta_window ────────────────────
   const withinWindow = await checkMetaWindow(contactId)
 
@@ -715,7 +724,7 @@ export async function handleTemplateStatusUpdate(
   const supabase = createAdminClient()
 
   // ── Mapeia status Meta → template_status do banco ─────────────────────────
-  const STATUS_MAP: Record<string, string> = {
+  const STATUS_MAP: Record<string, import('./supabase/types').TemplateStatus> = {
     APPROVED:  'approved',
     REJECTED:  'rejected',
     DISABLED:  'paused',
@@ -723,7 +732,7 @@ export async function handleTemplateStatusUpdate(
     PENDING:   'pending',
   }
 
-  const newStatus = STATUS_MAP[value.event] ?? 'pending'
+  const newStatus: import('./supabase/types').TemplateStatus = STATUS_MAP[value.event] ?? 'pending'
   const metaName  = value.message_template_name // ex: "booking_confirmation_a"
   const metaId    = String(value.message_template_id)
 

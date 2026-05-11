@@ -9,6 +9,10 @@ const s = strings.dashboard.conversations
 interface Message {
   id: string; content: string | null; direction: 'inbound' | 'outbound'
   sent_by?: 'lara' | 'professional' | null; created_at: string
+  message_type:   string
+  media_url?:     string | null
+  media_caption?: string | null
+  media_type?:    string | null
 }
 
 interface Props {
@@ -35,11 +39,12 @@ export function ChatInput({ contactId, professionalId, contactPhoneNumber, onMes
 
     // Bolha otimista
     const optimistic: Message = {
-      id: `opt-${Date.now()}`,
-      content: trimmed,
-      direction: 'outbound',
-      sent_by: 'professional',
-      created_at: new Date().toISOString(),
+      id:           `opt-${Date.now()}`,
+      content:      trimmed,
+      direction:    'outbound',
+      sent_by:      'professional',
+      created_at:   new Date().toISOString(),
+      message_type: 'text',
     }
     onMessageSent(optimistic)
     setText('')

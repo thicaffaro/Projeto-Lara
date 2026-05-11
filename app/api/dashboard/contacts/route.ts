@@ -71,8 +71,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       professional_id: session.professionalId,
       name: name?.trim() || null,
       phone_number: digits,
-      contact_type,
-      lara_mode,
+      contact_type: contact_type as 'client' | 'personal' | 'business' | 'unknown',
+      lara_mode: lara_mode as 'full' | 'booking_only' | 'silent',
       pre_registered: true,
     })
     .select('id')
