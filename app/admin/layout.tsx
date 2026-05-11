@@ -2,7 +2,13 @@
  * /app/admin/layout.tsx
  * Layout do painel admin — sidebar 200px + header + conteúdo desktop.
  * Auth via Supabase JWT (middleware garante role=super_admin).
+ *
+ * force-dynamic: todas as páginas admin fazem queries ao banco e NÃO devem
+ * ser pré-renderizadas estaticamente no build (causaria erro sem env vars).
  */
+
+// Propaga force-dynamic para todas as rotas filhas do segment /admin
+export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
 
