@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { createAdminClient } from '@/lib/supabase/admin'
 
 export default async function AdminAuditPage({ searchParams }: { searchParams: Promise<{ prof?: string; event?: string }> }) {

@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { createAdminClient } from '@/lib/supabase/admin'
 
 const LLM_COST_PER_MSG = 0.001   // ~US$0.001 por mensagem respondida pelo LLM

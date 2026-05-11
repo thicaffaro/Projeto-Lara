@@ -1,8 +1,10 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * /admin/page.tsx — Visão geral com KPIs, alertas e gráficos.
  */
 import { createAdminClient } from '@/lib/supabase/admin'
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
+import { AdminBarChart } from '@/components/admin/AdminBarChart'
 
 const PLAN_PRICE = 99 // R$ por profissional ativa
 
@@ -77,21 +79,8 @@ export default async function AdminPage() {
         ))}
       </div>
 
-      {/* Gráfico de novos cadastros */}
-      {chartData.length > 0 && (
-        <div className="rounded-2xl border border-gray-200 bg-white p-5">
-          <p className="mb-4 text-sm font-semibold text-gray-700">Novos cadastros por mês</p>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-              <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip />
-              <Bar dataKey="count" fill="#f43f5e" radius={[4,4,0,0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
+      {/* Gráfico de novos cadastros — cliente component (recharts exige 'use client') */}
+      <AdminBarChart data={chartData} />
     </div>
   )
 }
