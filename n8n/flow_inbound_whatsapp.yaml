@@ -1,0 +1,91 @@
+name: flow_inbound_whatsapp
+description: >
+  Recebe webhook do WhatsApp Business Cloud API (via /api/webhooks/whatsapp),
+  repassa para o endpoint Next.js /api/n8n/flow-inbound e trata erros no DLQ.
+
+nodes:
+  - id: trigger
+    type: n8n-nodes-base.webhook
+    name: Webhook WhatsApp
+    parameters:
+      path: /whatsapp-inbound
+      method: POST
+      authentication: headerAuth
+      headerName: X-N8N-Secret
+      headerValue: "={{ $env.N8N_WEBHOOK_SECRET }}"
+      responseMode: lastNode
+
+  - id: call_flow_inbound
+    type: n8n-nodes-base.httpRequest
+    name: Processar mensagem (Next.js)
+    parameters:
+      url: "={{ $env.NEXT_PUBLIC_APP_URL }}/api/n8n/flow-inbound"
+      method: POST
+      authentication: genericCredentialType
+      genericAuthType: httpHeaderAuth
+      sendHeaders: true
+      headerParameters:
+        parameters:
+          - name: Authorization
+            value: "Bearer {{ $env.N8N_WEBHOOK_SECRET }}"
+      sendBody: true
+      contentType: json
+      body: "={{ JSON.stringify($json) }}"
+      options:
+        timeout: 30000
+        retryOnFail: true
+        maxTries: 3
+        waitBetweenTries: 2000
+        response:
+          response:
+            neverError: false
+
+  - id: check_error
+    type: n8n-nodes-base.if
+    name: Erro 5xx?
+    parameters:
+      conditions:
+        boolean:
+          - value1: "={{ $json.error !== undefined }}"
+            value2: true
+
+  - id: insert_dlq
+    type: n8n-nodes-base.supabase
+    name: DLQ — salvar falha
+    parameters:
+      operation: insert
+      tableId: webhook_dlq
+      dataToSend: defineBelow
+      fieldsUi:
+        fieldValues:
+          - fieldId: source
+            fieldValue: whatsapp
+          - fieldId: payload
+            fieldValue: "={{ JSON.stringify($('trigger').item.json) }}"
+          - fieldId: error
+            fieldValue: "={{ $json.error ?? 'http_error' }}"
+          - fieldId: attempts
+            fieldValue: 1
+          - fieldId: last_attempt
+            fieldValue: "={{ new Date().toISOString() }}"
+
+  - id: respond_ok
+    type: n8n-nodes-base.respondToWebhook
+    name: Responder 200
+    parameters:
+      respondWith: json
+      responseBody: '{"ok":true}'
+      options:
+        responseCode: 200
+
+connections:
+  - source: trigger
+    target: call_flow_inbound
+  - source: call_flow_inbound
+    target: check_error
+    errorOutput: true
+  - source: check_error
+    target: insert_dlq
+    output: true   # branch true = tem erro
+  - source: call_flow_inbound
+    target: respond_ok

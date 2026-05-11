@@ -162,6 +162,36 @@ export interface Strings {
       screenCountTemplate: string
     }
   }
+
+  dashboard: {
+    tabs: {
+      home: string; agenda: string; conversations: string; contacts: string; lara: string
+    }
+    conversations: {
+      waitingForYou: string; laraCaring: string; recent: string
+      searchPlaceholder: string; windowExpired: string; sendTemplate: string
+      inputPlaceholder: string; laraLabel: string; handoverBanner: string
+      returnToLara: string; takeOver: string; silentBanner: string
+      bookingOnlyBanner: string; fullBanner: string; changeMode: string
+      modeUpdated: string; noTemplates: string; noMessages: string; loadMore: string
+    }
+    time: { now: string; today: string; yesterday: string }
+    contacts: {
+      title: string; all: string; clients: string; personal: string
+      suppliers: string; unknown: string; blocked: string; addContact: string
+      addPersonal: string; editName: string; blockConfirm: string; deleteConfirm: string
+      markVip: string; changeType: string; notes: string; address: string
+      history: string; openConversation: string
+    }
+    lara: {
+      title: string; identity: string; serviceMode: string; serviceAreas: string
+      protocols: string; workingHours: string; modes: string; defaultMode: string
+      cautious: string; cautiousDesc: string; standard: string; standardDesc: string
+      personalContacts: string; stats: string; pause: string; pausedBanner: string
+      silentHours: string; account: string; exportData: string; cancel: string
+      connection: string; reconnect: string; proactive: string
+    }
+  }
 }
 
 // ── Conteúdo em pt-BR ──────────────────────────────────────────────────────
@@ -452,6 +482,88 @@ export const ptBR: Strings = {
       navNext: 'Próximo',
       navDone: 'Entendi, voltar',
       screenCountTemplate: 'Tela {current} de {total}',
+    },
+  },
+
+  // ── Dashboard da profissional ─────────────────────────────────────────────
+  dashboard: {
+    tabs: {
+      home:          'Início',
+      agenda:        'Agenda',
+      conversations: 'Conversas',
+      contacts:      'Contatos',
+      lara:          'Lara',
+    },
+    conversations: {
+      waitingForYou:     'Aguardando você',
+      laraCaring:        'Lara cuidando',
+      recent:            'Recentes',
+      searchPlaceholder: 'Buscar por nome ou número',
+      windowExpired:     'A janela de 24h expirou. Você só pode enviar templates aprovados.',
+      sendTemplate:      'Enviar template',
+      inputPlaceholder:  'Digite sua mensagem...',
+      laraLabel:         '🤖 Lara',
+      handoverBanner:    'Você está respondendo essa conversa. A Lara não vai interromper.',
+      returnToLara:      'Devolver para Lara',
+      takeOver:          'Assumir conversa',
+      silentBanner:      'A Lara está em silêncio com esse contato. Você responde tudo.',
+      bookingOnlyBanner: 'A Lara responde só agendamentos. Mensagens fora disso ficam pra você.',
+      fullBanner:        'Lara está conversando com esse contato.',
+      changeMode:        'Mudar modo da Lara',
+      modeUpdated:       'Modo da Lara atualizado',
+      noTemplates:       'Seus templates ainda estão em análise pela Meta',
+      noMessages:        'Nenhuma conversa ainda.',
+      loadMore:          'Carregar mensagens anteriores',
+    },
+    time: {
+      now:       'agora',
+      today:     'Hoje',
+      yesterday: 'Ontem',
+    },
+    contacts: {
+      title:           'Contatos',
+      all:             'Todos',
+      clients:         'Clientes',
+      personal:        'Pessoais',
+      suppliers:       'Fornecedores',
+      unknown:         'Desconhecidos',
+      blocked:         'Bloqueados',
+      addContact:      'Adicionar contato',
+      addPersonal:     'Adicionar contato pessoal',
+      editName:        'Editar nome',
+      blockConfirm:    'Tem certeza? A Lara vai ignorar todas as mensagens desse contato.',
+      deleteConfirm:   'Tem certeza? Isso não pode ser desfeito.',
+      markVip:         'Marcar como VIP',
+      changeType:      'Mudar tipo',
+      notes:           'Anotações',
+      address:         'Endereço',
+      history:         'Histórico',
+      openConversation:'Abrir conversa',
+    },
+    lara: {
+      title:           'Configurações da Lara',
+      identity:        'Identidade',
+      serviceMode:     'Modo de atendimento',
+      serviceAreas:    'Áreas de atendimento',
+      protocols:       'Protocolos',
+      workingHours:    'Horários de trabalho',
+      modes:           'Modos da Lara',
+      defaultMode:     'Comportamento padrão para contatos novos',
+      cautious:        'Cuidadoso',
+      cautiousDesc:    'Contatos novos entram em silêncio. A Lara não responde até você classificar.',
+      standard:        'Padrão',
+      standardDesc:    'Contatos novos podem agendar imediatamente.',
+      personalContacts:'Contatos pessoais',
+      stats:           'Estatísticas',
+      pause:           'Pausar Lara',
+      pausedBanner:    'Lara está pausada. Ela não vai responder ninguém até você reativar.',
+      silentHours:     'Horários de silêncio',
+      account:         'Conta e assinatura',
+      exportData:      'Exportar meus dados',
+      cancel:          'Cancelar assinatura',
+      connection:      'Conexão WhatsApp',
+      reconnect:       'Reconectar',
+      proactive:       'Mensagens proativas',
     },
   },
 }

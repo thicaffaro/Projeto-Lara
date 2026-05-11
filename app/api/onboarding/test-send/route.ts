@@ -71,23 +71,43 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
   }
 
-  // ── Micro-teste 2: simulação de resposta da Lara (stub MVP) ──────────────
-  // Será substituído pelo flow_inbound real no Prompt C.
+  // ── Micro-teste 2: envia mensagem real via número da profissional ───────────
+  // Testa que a profissional consegue ENVIAR via WhatsApp Business (não apenas receber).
+  // Usa sendTextMessage do número da profissional para o próprio número dela.
   if (testIndex === 1) {
-    const protocols = (professional.protocols as Array<{ name: string }> | null) ?? []
-    const firstProtocol = protocols[0]?.name ?? 'limpeza de pele'
+    const phoneNumberId = (professional as unknown as { meta_phone_number_id: string | null }).meta_phone_number_id
 
-    // Gera horários disponíveis fictícios com base nos horários configurados
-    const simulatedResponse =
-      `Oi! 😊 Tenho sessão de ${firstProtocol} disponível `
-      + `quinta às 14h ou sexta às 10h. Qual fica melhor para você?`
+    if (!phoneNumberId) {
+      return NextResponse.json({ ok: false, error: 'meta_phone_number_id não configurado' }, { status: 400 })
+    }
 
-    return NextResponse.json({
-      ok: true,
-      test: 'booking_simulation',
-      simulatedResponse,
-      note: 'Stub MVP — resposta real gerada pelo motor de IA no Prompt C',
-    }, { status: 200 })
+    try {
+      const { sendTextMessage, getProfessionalToken } = await import('@/lib/whatsapp')
+      // Decriptografa token para envio
+      const token = await getProfessionalToken(professionalId)
+
+      // Envia do número da profissional → para o próprio número dela (confirma envio)
+      await sendTextMessage(
+        phoneNumberId,
+        token,
+        (professional as unknown as { phone_number: string }).phone_number,
+        `Olá! Esta é a Lara testando sua conexão. 😊 Se recebeu, está tudo funcionando!`,
+        professionalId,
+      )
+
+      const protocols = (professional.protocols as Array<{ name: string }> | null) ?? []
+      const firstProtocol = protocols[0]?.name ?? 'limpeza de pele'
+
+      return NextResponse.json({
+        ok: true,
+        test: 'booking_simulation',
+        simulatedResponse: `Oi! 😊 Tenho sessão de ${firstProtocol} disponível quinta às 14h ou sexta às 10h. Qual fica melhor para você?`,
+        note: 'Mensagem de teste enviada via número da profissional (Prompt C implementado)',
+      }, { status: 200 })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Falha ao enviar'
+      return NextResponse.json({ ok: false, error: msg }, { status: 502 })
+    }
   }
 
   // ── Micro-teste 3: preview do template booking_confirmation ───────────────

@@ -1,0 +1,5 @@
+name: flow_human_handover
+description: "Stub — implementação completa no Prompt E."
+# Trigger e nodes serão detalhados quando o cron scheduler do n8n estiver configurado.
+nodes: []
+connections: {}

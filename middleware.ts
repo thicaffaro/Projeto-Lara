@@ -30,6 +30,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { checkRateLimit, rateLimitHeaders, getClientIp } from '@/lib/ratelimit'
 import { checkPendingAcceptance } from '@/lib/legal/check-pending-acceptance'
+import { validateDashboardSession, COOKIE_NAME as SESSION_COOKIE } from '@/lib/auth/dashboardSession'
 
 // ── Padrão "block by default, exempt by exception" ────────────────────────────
 // Rotas que funcionam MESMO sem aceite legal vigente.
@@ -48,11 +49,12 @@ const LEGAL_WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
 export const config = {
   matcher: [
-    '/dashboard/:path*',           // redirect de onboarding
+    '/dashboard/:path*',           // auth de sessão + onboarding redirect
+    '/admin/:path*',               // auth Supabase + role admin
     '/api/onboarding/:path*',
-    '/api/dashboard/:path*',       // inclui rotas de escrita + bloqueio legal
+    '/api/dashboard/:path*',       // rate limit + bloqueio legal
     '/api/admin/:path*',
-    // /api/webhooks/* e /api/legal/* são intencionalmente EXCLUÍDOS
+    // /d/:token, /auth/*, /api/webhooks/*, /api/legal/* são EXCLUÍDOS
   ],
 }
 
@@ -60,6 +62,50 @@ export const config = {
 
 export async function middleware(req: NextRequest): Promise<NextResponse> {
   const { pathname } = req.nextUrl
+
+  // ── Auth de admin (/admin/*) ────────────────────────────────────────────────
+  if (pathname.startsWith('/admin')) {
+    try {
+      const supabase = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+          cookies: {
+            getAll: () => req.cookies.getAll(),
+            setAll: () => {},
+          },
+        }
+      )
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user || user.user_metadata?.role !== 'super_admin') {
+        return NextResponse.redirect(new URL('/admin/login', req.url))
+      }
+    } catch {
+      return NextResponse.redirect(new URL('/admin/login', req.url))
+    }
+    return NextResponse.next()
+  }
+
+  // ── Auth de dashboard (/dashboard/*) via sessão httpOnly ───────────────────
+  // Aceita TANTO dashboard_session cookie (magic link + PIN) QUANTO Supabase Auth
+  // (onboarding flow). Onboarding redirect verificado depois.
+  if (pathname.startsWith('/dashboard')) {
+    // Tentativa 1: dashboard_session cookie (magic link + PIN)
+    const sessionToken = req.cookies.get(SESSION_COOKIE)?.value
+    if (sessionToken) {
+      try {
+        const session = await validateDashboardSession(sessionToken)
+        if (session) {
+          // Sessão válida — passa para o redirect de onboarding abaixo
+        } else {
+          return NextResponse.redirect(new URL('/auth/expired', req.url))
+        }
+      } catch {
+        return NextResponse.redirect(new URL('/auth/expired', req.url))
+      }
+    }
+    // Tentativa 2: Supabase Auth (onboarding) — verificado no bloco abaixo
+  }
 
   // ── Redirect de onboarding ─────────────────────────────────────────────────
   if (pathname.startsWith('/dashboard')) {

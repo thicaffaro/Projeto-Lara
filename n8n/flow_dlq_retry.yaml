@@ -1,0 +1,135 @@
+name: flow_dlq_retry
+description: >
+  Reprocessa mensagens que falharam e foram para o webhook_dlq.
+  Roda a cada 10 minutos. Marca como permanent_failure após 5 tentativas.
+
+nodes:
+  - id: cron
+    type: n8n-nodes-base.scheduleTrigger
+    name: Cron 10min
+    parameters:
+      rule:
+        interval:
+          - field: minutes
+            minutesInterval: 10
+
+  - id: fetch_pending
+    type: n8n-nodes-base.supabase
+    name: Buscar DLQ pendentes
+    parameters:
+      operation: getAll
+      tableId: webhook_dlq
+      returnAll: false
+      limit: 50
+      filterType: string
+      filterString: "status=eq.pending&attempts=lt.5"
+
+  - id: retry_each
+    type: n8n-nodes-base.splitInBatches
+    name: Processar cada item
+    parameters:
+      batchSize: 1
+
+  - id: call_flow
+    type: n8n-nodes-base.httpRequest
+    name: Retentar flow-inbound
+    parameters:
+      url: "={{ $env.NEXT_PUBLIC_APP_URL }}/api/n8n/flow-inbound"
+      method: POST
+      sendHeaders: true
+      headerParameters:
+        parameters:
+          - name: Authorization
+            value: "Bearer {{ $env.N8N_WEBHOOK_SECRET }}"
+      sendBody: true
+      contentType: json
+      body: "={{ $json.payload }}"
+      options:
+        timeout: 30000
+        retryOnFail: false  # Sem retry aqui — o loop externo já controla
+
+  - id: update_success
+    type: n8n-nodes-base.supabase
+    name: Marcar resolvido
+    parameters:
+      operation: update
+      tableId: webhook_dlq
+      filters:
+        id: "={{ $('retry_each').item.json.id }}"
+      fieldsUi:
+        fieldValues:
+          - fieldId: status
+            fieldValue: resolved
+          - fieldId: resolved_at
+            fieldValue: "={{ new Date().toISOString() }}"
+
+  - id: increment_attempts
+    type: n8n-nodes-base.supabase
+    name: Incrementar tentativas
+    parameters:
+      operation: update
+      tableId: webhook_dlq
+      filters:
+        id: "={{ $('retry_each').item.json.id }}"
+      fieldsUi:
+        fieldValues:
+          - fieldId: attempts
+            fieldValue: "={{ $('retry_each').item.json.attempts + 1 }}"
+          - fieldId: last_attempt
+            fieldValue: "={{ new Date().toISOString() }}"
+          - fieldId: error
+            fieldValue: "={{ $json.error ?? 'retry_failed' }}"
+
+  - id: check_permanent
+    type: n8n-nodes-base.if
+    name: Atingiu 5 tentativas?
+    parameters:
+      conditions:
+        number:
+          - value1: "={{ $('retry_each').item.json.attempts + 1 }}"
+            operation: largerEqual
+            value2: 5
+
+  - id: mark_permanent
+    type: n8n-nodes-base.supabase
+    name: Marcar falha permanente
+    parameters:
+      operation: update
+      tableId: webhook_dlq
+      filters:
+        id: "={{ $('retry_each').item.json.id }}"
+      fieldsUi:
+        fieldValues:
+          - fieldId: status
+            fieldValue: permanent_failure
+
+  - id: notify_admin_permanent
+    type: n8n-nodes-base.httpRequest
+    name: Notificar admin (falha permanente)
+    parameters:
+      url: "={{ $env.NEXT_PUBLIC_APP_URL }}/api/webhooks/whatsapp"
+      # Envia via sendFromOfficialNumber para LARA_OPS_PHONE
+      # Implementar via API interna no Prompt E
+      method: POST
+      body: '{"type":"ops_alert","message":"DLQ permanent failure detected"}'
+
+connections:
+  - source: cron
+    target: fetch_pending
+  - source: fetch_pending
+    target: retry_each
+  - source: retry_each
+    target: call_flow
+  - source: call_flow
+    target: update_success
+    output: main
+  - source: call_flow
+    target: increment_attempts
+    errorOutput: true
+  - source: increment_attempts
+    target: check_permanent
+  - source: check_permanent
+    target: mark_permanent
+    output: true   # 5+ tentativas
+  - source: mark_permanent
+    target: notify_admin_permanent
