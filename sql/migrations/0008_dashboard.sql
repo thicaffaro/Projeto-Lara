@@ -46,8 +46,8 @@ CREATE TABLE IF NOT EXISTS dashboard_sessions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_dashboard_sessions_token
-  ON dashboard_sessions (session_token)
-  WHERE expires_at > NOW();
+  ON dashboard_sessions (session_token);
+  -- WHERE expires_at > NOW() removido: NOW() não é IMMUTABLE em predicado de índice
 
 CREATE INDEX IF NOT EXISTS idx_dashboard_sessions_professional
   ON dashboard_sessions (professional_id, expires_at DESC);
@@ -55,7 +55,8 @@ CREATE INDEX IF NOT EXISTS idx_dashboard_sessions_professional
 ALTER TABLE dashboard_sessions ENABLE ROW LEVEL SECURITY;
 
 -- Profissional acessa apenas suas próprias sessões
-CREATE POLICY IF NOT EXISTS dashboard_sessions_own ON dashboard_sessions
+DROP POLICY IF EXISTS dashboard_sessions_own ON dashboard_sessions;
+CREATE POLICY dashboard_sessions_own ON dashboard_sessions
   FOR ALL USING (professional_id IN (
     SELECT id FROM professionals WHERE auth_user_id = auth.uid()
   ));

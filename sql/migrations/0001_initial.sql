@@ -192,16 +192,9 @@ CREATE TABLE appointments (
   created_at               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-  PRIMARY KEY (id, starts_at),
-
-  CONSTRAINT no_overlap EXCLUDE USING gist (
-    professional_id WITH =,
-    tstzrange(
-      starts_at - (travel_buffer_before_min || ' minutes')::interval,
-      ends_at   + (travel_buffer_after_min  || ' minutes')::interval,
-      '[)'
-    ) WITH &&
-  )
+  PRIMARY KEY (id, starts_at)
+  -- NOTA: EXCLUDE USING gist não é suportado em tabelas particionadas (PG 17).
+  -- A verificação de sobreposição é feita pela RPC is_slot_available().
 ) PARTITION BY RANGE (starts_at);
 
 COMMENT ON TABLE appointments IS
@@ -245,7 +238,7 @@ CREATE TABLE messages (
   id                       UUID NOT NULL DEFAULT uuid_generate_v4(),
   professional_id          UUID NOT NULL REFERENCES professionals(id) ON DELETE CASCADE,
   contact_id               UUID NULL REFERENCES contacts(id) ON DELETE SET NULL,
-  meta_message_id          TEXT UNIQUE,
+  meta_message_id          TEXT,      -- sem UNIQUE: particionada por created_at; dedup via query
   direction                message_direction NOT NULL,
   message_type             message_type NOT NULL DEFAULT 'text',
   content                  TEXT,
@@ -454,12 +447,8 @@ CREATE TABLE schedule_blocks (
   ends_at         TIMESTAMPTZ NOT NULL,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-  PRIMARY KEY (id, starts_at),
-
-  CONSTRAINT no_block_overlap EXCLUDE USING gist (
-    professional_id WITH =,
-    tstzrange(starts_at, ends_at, '[)') WITH &&
-  )
+  PRIMARY KEY (id, starts_at)
+  -- NOTA: EXCLUDE USING gist não é suportado em tabelas particionadas (PG 17).
 ) PARTITION BY RANGE (starts_at);
 
 CREATE TABLE schedule_blocks_2025 PARTITION OF schedule_blocks
