@@ -14,6 +14,7 @@
  */
 
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { EmbeddedSignupForm } from '@/components/forms/EmbeddedSignupForm'
 
 export const metadata: Metadata = {
@@ -28,12 +29,12 @@ export default function CadastroPage() {
       <div className="mx-auto max-w-md">
         {/* Header */}
         <div className="mb-8 text-center">
-          <a
+          <Link
             href="/"
             className="inline-block text-xl font-bold text-gray-900 hover:text-rose-500 transition-colors"
           >
             Lara
-          </a>
+          </Link>
           <p className="mt-2 text-sm text-gray-500">
             7 dias grátis • Sem cartão de crédito
           </p>
