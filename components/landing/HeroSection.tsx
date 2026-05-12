@@ -89,7 +89,7 @@ export function HeroSection() {
           className="mt-8 flex flex-col items-center gap-3"
         >
           <a
-            href="/onboarding/setup"
+            href="/cadastro"
             className="w-full max-w-xs rounded-xl bg-rose-500 px-8 py-4 text-base font-semibold text-white shadow-sm transition hover:bg-rose-600 active:scale-95 sm:w-auto"
           >
             {s.cta}

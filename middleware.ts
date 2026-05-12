@@ -124,8 +124,8 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
       const { data: { user } } = await supabase.auth.getUser()
 
       if (!user) {
-        // Não autenticado — redireciona para landing page
-        return NextResponse.redirect(new URL('/', req.url))
+        // Não autenticado — redireciona para cadastro
+        return NextResponse.redirect(new URL('/cadastro', req.url))
       }
 
       // onboarding_completed é armazenado no user_metadata após o passo 7
