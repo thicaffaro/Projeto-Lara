@@ -30,7 +30,7 @@ export default async function ChangePinPage() {
   )
 
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/cadastro')
+  if (!user) redirect('/auth/pin')
 
   const { data: raw } = await supabase
     .from('professionals')

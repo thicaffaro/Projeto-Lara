@@ -36,7 +36,7 @@ export default async function OnboardingSetupPage() {
   )
 
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/cadastro')
+  if (!user) redirect('/')
 
   // Busca estado atual do profissional para inicializar o stepper.
   const { data: rawProfessional } = await supabase
@@ -51,7 +51,7 @@ export default async function OnboardingSetupPage() {
 
   const professional = rawProfessional as unknown as ProfessionalRow | null
 
-  if (!professional) redirect('/cadastro')
+  if (!professional) redirect('/')
   if (professional.onboarding_completed) redirect('/dashboard')
 
   // Busca contatos pré-cadastrados (passo 5)

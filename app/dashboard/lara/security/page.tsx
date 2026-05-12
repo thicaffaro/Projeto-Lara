@@ -30,7 +30,7 @@ export default async function SecurityPage() {
   )
 
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/cadastro')
+  if (!user) redirect('/auth/pin')
 
   const { data: raw } = await supabase
     .from('professionals')
