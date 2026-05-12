@@ -73,7 +73,7 @@ export function OnboardingSteps() {
           className="mt-12 text-center"
         >
           <a
-            href="/cadastro"
+            href="/onboarding/setup"
             className="inline-block rounded-xl bg-rose-500 px-8 py-4 text-base font-semibold text-white shadow-sm transition hover:bg-rose-600 active:scale-95"
           >
             Começar agora grátis

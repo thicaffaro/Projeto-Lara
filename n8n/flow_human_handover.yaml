@@ -1,5 +1,15 @@
 name: flow_human_handover
-description: "Stub — implementação completa no Prompt E."
-# Trigger e nodes serão detalhados quando o cron scheduler do n8n estiver configurado.
+description: >
+  STUB — lógica de escalada já está implementada inline no flow_inbound_whatsapp.
+  Quando intent=SUPORTE ou o LLM retorna '__handover__', o flowInbound.ts chama
+  triggerHumanHandover() que cria o registro em human_handovers e notifica
+  a profissional via sendFromOfficialNumber().
+  Este flow n8n NÃO é necessário para o MVP.
+  Pós-MVP: implementar timeout de handover (alerta se handover > 30min sem resposta).
+
 nodes: []
 connections: {}
+
+settings:
+  executionOrder: v1
+tags: [stub, pós-mvp]

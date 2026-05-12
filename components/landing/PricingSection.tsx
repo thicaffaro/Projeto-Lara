@@ -51,7 +51,7 @@ export function PricingSection() {
 
             {/* CTA */}
             <a
-              href="/cadastro"
+              href="/onboarding/setup"
               className="mt-8 block w-full rounded-xl bg-rose-500 px-6 py-4 text-center text-base font-semibold text-white shadow-sm transition hover:bg-rose-600 active:scale-95"
             >
               {s.cta}

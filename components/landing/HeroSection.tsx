@@ -11,6 +11,7 @@
  */
 
 import { motion, useReducedMotion } from 'framer-motion'
+import Link from 'next/link'
 import { strings } from '@/lib/strings'
 
 export function HeroSection() {
@@ -88,7 +89,7 @@ export function HeroSection() {
           className="mt-8 flex flex-col items-center gap-3"
         >
           <a
-            href="/cadastro"
+            href="/onboarding/setup"
             className="w-full max-w-xs rounded-xl bg-rose-500 px-8 py-4 text-base font-semibold text-white shadow-sm transition hover:bg-rose-600 active:scale-95 sm:w-auto"
           >
             {s.cta}
@@ -97,12 +98,12 @@ export function HeroSection() {
           {/* Nota metodologia */}
           <p className="text-xs text-gray-400">
             {s.methodologyNote.text}{' '}
-            <a
-              href="/docs/methodology"
+            <Link
+              href="/#como-funciona"
               className="underline underline-offset-2 hover:text-gray-600"
             >
               {s.methodologyNote.linkLabel}
-            </a>
+            </Link>
           </p>
         </motion.div>
       </div>

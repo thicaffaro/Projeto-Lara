@@ -1,5 +1,78 @@
 name: flow_reminders
-description: "Stub — implementação completa no Prompt E."
-# Trigger e nodes serão detalhados quando o cron scheduler do n8n estiver configurado.
-nodes: []
-connections: {}
+description: >
+  Envia lembretes de sessão 24h e 2h antes para clientes.
+  Lembrete domiciliar (service_location='client_home') inclui endereço.
+  Chama POST /api/n8n/reminders a cada 30 minutos.
+  Endpoint: /api/n8n/reminders — auth via N8N_WEBHOOK_SECRET.
+
+nodes:
+  - id: cron
+    name: Cron 30min
+    type: n8n-nodes-base.scheduleTrigger
+    typeVersion: 1.2
+    position: [240, 300]
+    parameters:
+      rule:
+        interval:
+          - field: minutes
+            minutesInterval: 30
+
+  - id: call_reminders
+    name: Disparar lembretes
+    type: n8n-nodes-base.httpRequest
+    typeVersion: 4.1
+    position: [460, 300]
+    parameters:
+      method: POST
+      url: "={{ $env['NEXT_PUBLIC_APP_URL'] }}/api/n8n/reminders"
+      sendHeaders: true
+      headers:
+        values:
+          - name: Authorization
+            value: "=Bearer {{ $env['N8N_WEBHOOK_SECRET'] }}"
+          - name: Content-Type
+            value: application/json
+      options:
+        timeout: 60000
+        retryOnFail: true
+        maxTries: 2
+        waitBetweenTries: 10000
+
+  - id: log_result
+    name: Log resultado
+    type: n8n-nodes-base.set
+    typeVersion: 3
+    position: [680, 300]
+    parameters:
+      mode: manual
+      fields:
+        values:
+          - name: sent_24h
+            type: number
+            numberValue: "={{ $json.sent_24h }}"
+          - name: sent_2h
+            type: number
+            numberValue: "={{ $json.sent_2h }}"
+          - name: errors
+            type: number
+            numberValue: "={{ $json.errors }}"
+
+connections:
+  Cron 30min:
+    main:
+      - - node: Disparar lembretes
+          type: main
+          index: 0
+  Disparar lembretes:
+    main:
+      - - node: Log resultado
+          type: main
+          index: 0
+
+settings:
+  executionOrder: v1
+  saveManualExecutions: true
+tags:
+  - lara-reminders
+  - cron
+  - critical-mvp

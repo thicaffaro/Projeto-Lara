@@ -1440,6 +1440,12 @@ export interface Database {
         Returns: string | null
       }
 
+      /** Percentis de latência dos últimos N minutos. Adicionado em 0013. */
+      get_latency_percentiles: {
+        Args:    { p_since: string }
+        Returns: Array<{ p50: number | null; p95: number | null; p99: number | null }>
+      }
+
     }
 
     // ── Enums ─────────────────────────────────────────────────────────────────

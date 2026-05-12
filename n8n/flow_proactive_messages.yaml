@@ -1,5 +1,45 @@
 name: flow_proactive_messages
-description: "Stub — implementação completa no Prompt E."
-# Trigger e nodes serão detalhados quando o cron scheduler do n8n estiver configurado.
-nodes: []
-connections: {}
+description: >
+  Cron a cada 15 minutos. Para cada profissional ativa, avalia regras
+  de proactive_message_rules e envia via número oficial Lara.
+  Respeita horário (22h–8h = silêncio) e limite de 3/dia.
+  Endpoint: /api/n8n/proactive-messages
+
+nodes:
+  - id: cron
+    name: Cron 15min
+    type: n8n-nodes-base.scheduleTrigger
+    typeVersion: 1.2
+    position: [240, 300]
+    parameters:
+      rule:
+        interval:
+          - field: minutes
+            minutesInterval: 15
+  - id: proactive
+    name: Enviar proativas
+    type: n8n-nodes-base.httpRequest
+    typeVersion: 4.1
+    position: [460, 300]
+    parameters:
+      method: POST
+      url: "={{ $env['NEXT_PUBLIC_APP_URL'] }}/api/n8n/proactive-messages"
+      sendHeaders: true
+      headers:
+        values:
+          - name: Authorization
+            value: "=Bearer {{ $env['N8N_WEBHOOK_SECRET'] }}"
+      options:
+        timeout: 60000
+        retryOnFail: false
+
+connections:
+  Cron 15min:
+    main:
+      - - node: Enviar proativas
+          type: main
+          index: 0
+
+settings:
+  executionOrder: v1
+tags: [lara-proactive, cron]

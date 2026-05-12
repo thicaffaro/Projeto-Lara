@@ -1,5 +1,15 @@
 name: flow_cancellation
-description: "Stub — implementação completa no Prompt E."
-# Trigger e nodes serão detalhados quando o cron scheduler do n8n estiver configurado.
+description: >
+  STUB — lógica de cancelamento já está implementada inline no flow_inbound_whatsapp.
+  Quando um cliente envia mensagem com intent=CANCELAR, o flowInbound.ts chama
+  handleCancellationFlow() de /lib/ai/cancellationFlow.ts diretamente.
+  Este flow n8n NÃO é necessário para o MVP.
+  Pós-MVP: implementar como trigger de evento (appointment.cancelled) para
+  fluxos de cancelamento iniciados pela profissional via dashboard.
+
 nodes: []
 connections: {}
+
+settings:
+  executionOrder: v1
+tags: [stub, pós-mvp]
